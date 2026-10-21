@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../../launcher/windows/BloodborneLauncher/Core/Hardware.cs" Link="Hardware.cs" />
+    <Compile Include="../../../launcher/windows/BloodborneLauncher/Core/UpscalerRecommendation.cs" Link="UpscalerRecommendation.cs" />
+    <Compile Include="../../../launcher/windows/BloodborneLauncher/Core/GpuAdapters.cs" Link="GpuAdapters.cs" />
+    <Compile Include="../../../launcher/windows/BloodborneLauncher/Core/Choices.cs" Link="Choices.cs" />
+    <Compile Include="../../../launcher/windows/BloodborneLauncher/Core/LauncherSettings.cs" Link="LauncherSettings.cs" />
+    <Compile Include="../../../launcher/windows/BloodborneLauncher/Core/IniFile.cs" Link="IniFile.cs" />
+    <Compile Include="../../../launcher/windows/BloodborneLauncher/Core/PcText.cs" Link="PcText.cs" />
+  </ItemGroup>
+<ItemGroup><Compile Include="../../../launcher/windows/BloodborneLauncher/Core/UiText.cs" Link="UiText.cs"/><EmbeddedResource Include="../../../launcher/windows/BloodborneLauncher/Localization/*.json"><LogicalName>BloodborneLauncher.Localization.%(Filename).json</LogicalName></EmbeddedResource></ItemGroup></Project>

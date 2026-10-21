@@ -1,7 +1,26 @@
+diff --git a/gpu/shadps4/video_core/renderer_vulkan/vk_temporal_upscaler.cpp b/gpu/shadps4/video_core/renderer_vulkan/vk_temporal_upscaler.cpp
+--- a/gpu/shadps4/video_core/renderer_vulkan/vk_temporal_upscaler.cpp
++++ b/gpu/shadps4/video_core/renderer_vulkan/vk_temporal_upscaler.cpp
+@@ -367,12 +367,13 @@
+     const bool active = Active();
+     const bool jitter_on = active && settings.jitter && !BbToggle::Disabled(1u << 25);
+     const int upscaler = settings.upscaler.load();
+-    const int output = settings.output_res.load();
++    const int output = BbSettings::RenderOutput();
+     const bool output_changed = !scaled_session && applied_output != output;
+     if (output_changed) {
+         target_width = BbSettings::OutputWidth(output);
+         target_height = BbSettings::OutputHeight(output);
+-        std::printf("Output resolution: %ux%u (live)\n", target_width, target_height);
++        std::printf("Output resolution: %ux%u (%s)\n", target_width, target_height,
++                    BbSettings::LiveOutputChangesEnabled() ? "live" : "startup; changes require restart");
+         failed = false;
+         fsr4_failed = false;
+     }
 diff --git a/gpu/shim/bbport_settings.cpp b/gpu/shim/bbport_settings.cpp
 --- a/gpu/shim/bbport_settings.cpp
 +++ b/gpu/shim/bbport_settings.cpp
-@@ -1,612 +1,629 @@
+@@ -1,612 +1,643 @@
 -#ifdef _WIN32
 -#ifndef NOMINMAX
 -#define NOMINMAX
@@ -1064,6 +1083,19 @@ diff --git a/gpu/shim/bbport_settings.cpp b/gpu/shim/bbport_settings.cpp
 +    return size && size[0];
 +}
 +
++bool LiveOutputChangesEnabled() {
++    if (FixedRenderSession()) return false;
++    const char* resolved = std::getenv("BB_LIVE_RES");
++    if (resolved && resolved[0]) return std::strcmp(resolved, "1") == 0;
++    // A direct engine start without the Windows resolver uses the explicit startup setting.
++    return Get().startup_live_resolution == 1;
++}
++
++int RenderOutput() {
++    const auto& v = Get();
++    return LiveOutputChangesEnabled() ? v.output_res.load() : v.startup_output_res;
++}
++
 +int RenderPreset() {
 +    const auto& v = Get();
 +    return FixedRenderSession() ? v.startup_preset :
@@ -1072,6 +1104,7 @@ diff --git a/gpu/shim/bbport_settings.cpp b/gpu/shim/bbport_settings.cpp
 +
 +bool ResolutionNeedsRestart() {
 +    const auto& v = Get();
++    if (!LiveOutputChangesEnabled() && v.output_res != v.startup_output_res) return true;
 +    // TAA needs the live path (native guest targets): run.sh selects it on restart.
 +    return FixedRenderSession() &&
 +        (v.preset != v.startup_preset || v.output_res != v.startup_output_res ||
@@ -1259,7 +1292,17 @@ diff --git a/gpu/shim/bbport_settings.h b/gpu/shim/bbport_settings.h
      std::atomic<int> button_prompts{PromptsAuto}; ///< ButtonPrompts; live
      std::atomic<int> pad_icons{PadIconsAuto}; ///< PadIcons; live
      std::atomic<bool> change_appearance{false}, rebirth{false}; // next launch, engine features
-@@ -209,3 +212,5 @@
+@@ -198,6 +201,9 @@
+ void ConfigureUpscalerSupport(bool fsr4, bool fsr411, bool dlss = false);
+ /// Startup-patched scene dimensions cannot change until run.sh prepares a new image.
+ bool FixedRenderSession();
++/// Output changes require restart when disabled, independently of the guest resolution patch.
++bool LiveOutputChangesEnabled();
++int RenderOutput();
+ int RenderPreset();
+ bool ResolutionNeedsRestart();
+ /// Writes the file (menu changes).
+@@ -209,3 +215,5 @@
  const char* UpscalerName(int upscaler);
  
  } // namespace BbSettings
@@ -9050,7 +9093,7 @@ new file mode 100644
 diff --git a/scripts/run_windows.py b/scripts/run_windows.py
 --- a/scripts/run_windows.py
 +++ b/scripts/run_windows.py
-@@ -1,401 +1,409 @@
+@@ -1,401 +1,425 @@
 -#!/usr/bin/env python3
 -# SPDX-License-Identifier: GPL-2.0-or-later
 -"""Windows counterpart of run.sh: prepare the game image, compile the patches and start
@@ -9518,6 +9561,28 @@ diff --git a/scripts/run_windows.py b/scripts/run_windows.py
 +        return None
 +
 +
++def configure_live_resolution(config, out):
++    """Resolve once for every output, including native 1080p and TAA, and pass it to the renderer."""
++    # A restarted probe inherits our resolved flag. Do not mistake that generated value
++    # for an explicit user override and pin the old selection across Apply and restart.
++    source = os.environ.get('BB_LIVE_RES_SOURCE')
++    override = None if source == 'settings' else 'auto' if source == 'auto-override' else os.environ.get('BB_LIVE_RES')
++    requested = override or settings_value(config, 'live_resolution') or '0'
++    if not override:
++        os.environ['BB_LIVE_RES_SOURCE'] = 'settings'
++    elif override == 'auto':
++        os.environ['BB_LIVE_RES_SOURCE'] = 'auto-override'
++    else:
++        os.environ.pop('BB_LIVE_RES_SOURCE', None)
++    resolved = requested
++    if requested == 'auto':
++        resolved = run([out / 'bb-gpu-capabilities.exe', '--live-resolution'], capture=True, check=False) or '0'
++    resolved = '1' if resolved == '1' else '0'
++    os.environ['BB_LIVE_RES'] = resolved
++    print(f'Live output resolution changes: {"on" if resolved == "1" else "off (restart required)"}', flush=True)
++    return resolved
++
++
 +def large_scene(render):
 +    """Whether a scene of `render` ('WxH') needs the 9152 MiB pool: above 1920x1080."""
 +    w, h = (int(v) for v in render.split('x'))
@@ -9785,14 +9850,8 @@ diff --git a/scripts/run_windows.py b/scripts/run_windows.py
 +            sizes = run([PYTHON, SCRIPTS / 'patches.py', '--print-scaled', '--settings', config], capture=True, check=False)
 +            if sizes and len(sizes.split()) == 2:
 +                scaled_render, scaled_output = sizes.split()
-+        live = '0'
-+        if scaled_output:
-+            live = os.environ.get('BB_LIVE_RES') or settings_value(config, 'live_resolution') or '0'
-+            if live == 'auto':
-+                caps = out / 'bb-gpu-capabilities.exe'
-+                live = run([caps, '--live-resolution'], capture=True, check=False) or '0'
-+            live = '1' if live == '1' else '0'
-+        if live == '1':
++        live = configure_live_resolution(config, out)
++        if live == '1' and scaled_output:
 +            print(f'Output {scaled_output}: live resolution changes (live_resolution=0: startup patch)')
 +        elif scaled_output:
 +            os.environ.update(BB_RENDER_RES=scaled_render, BB_OUTPUT_RES=scaled_output, BB_AUTO_RENDER_RES='1')
@@ -11603,6 +11662,44 @@ diff --git a/tests/test_pc_input.cpp b/tests/test_pc_input.cpp
  void host_log(const char*,...) {}
  bool debug_menu_active(){return false;}
  uint32_t menu_confirm_button(){return 0x4000;}
+diff --git a/tests/test_upscaler_support.cpp b/tests/test_upscaler_support.cpp
+--- a/tests/test_upscaler_support.cpp
++++ b/tests/test_upscaler_support.cpp
+@@ -28,6 +28,7 @@
+     assert(RenderPreset() == NativeAA && !ResolutionNeedsRestart());
+     s.upscaler = UpscalerFsr3;
+     assert(RenderPreset() == Performance);
++    // This FSR capability matrix assumes the independent DLSS provider is available.
+     for (bool fsr4 : {false, true}) {
+         for (bool fsr411 : {false, true}) {
+             for (int requested = 0; requested < UpscalerCount; ++requested) {
+@@ -39,18 +40,20 @@
+                 s.fsr4_problem = nullptr;
+                 Load();
+                 assert(s.upscaler == requested);
+-                ConfigureUpscalerSupport(fsr4, fsr411);
+-                const bool unsupported = (requested == UpscalerFsr4 && !fsr4) ||
+-                    (requested == UpscalerFsr411 && !(fsr4 && fsr411));
+-                assert(s.upscaler == (unsupported ? UpscalerFsr3 : requested));
++                ConfigureUpscalerSupport(fsr4, fsr411, true);
++                const int expected = requested == UpscalerFsr411 && !(fsr4 && fsr411)
++                    ? (fsr4 ? UpscalerFsr4 : UpscalerFsr3)
++                    : requested == UpscalerFsr4 && !fsr4 ? UpscalerFsr3 : requested;
++                const bool unsupported = expected != requested;
++                assert(s.upscaler == expected);
+                 assert(s.fsr4_supported == fsr4);
+                 assert(s.fsr411_supported == (fsr4 && fsr411));
+                 assert(bool(s.fsr4_problem.load()) == unsupported);
+                 assert(s.preset == Performance && s.output_res == 2);
+                 // Startup patch settings still describe the already applied guest patches.
+                 assert(s.startup_upscaler == requested);
+-                ConfigureUpscalerSupport(fsr4, fsr411);
+-                assert(s.upscaler == (unsupported ? UpscalerFsr3 : requested));
++                ConfigureUpscalerSupport(fsr4, fsr411, true);
++                assert(s.upscaler == expected);
+             }
+         }
+     }
 diff --git a/tools/engine/menu_assets.cpp b/tools/engine/menu_assets.cpp
 --- a/tools/engine/menu_assets.cpp
 +++ b/tools/engine/menu_assets.cpp

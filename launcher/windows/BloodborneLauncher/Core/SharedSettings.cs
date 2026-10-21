@@ -86,11 +86,11 @@ namespace BloodborneLauncher.Core
         public static Snapshot Parse(string text)
         {
             if (text.Length > MaxChars * 2)
-                throw new FormatException("That is far too long to be shared settings.");
+                throw new FormatException(BloodborneLauncher.Core.UiText.T("That is far too long to be shared settings."));
             var code = Regex.Match(text, Regex.Escape(CodePrefix) + @"\s*([A-Za-z0-9_\-]+)", RegexOptions.IgnoreCase);
             var json = code.Success ? Unpack(code.Groups[1].Value) : text.Trim();
             if (!json.StartsWith('{'))
-                throw new FormatException($"That is not a settings code. Codes start with {CodePrefix}");
+                throw new FormatException(BloodborneLauncher.Core.UiText.F($"That is not a settings code. Codes start with {CodePrefix}"));
 
             JsonObject root;
             try
@@ -99,10 +99,10 @@ namespace BloodborneLauncher.Core
             }
             catch (Exception e) when (e is JsonException or FormatException)
             {
-                throw new FormatException("The settings are damaged (copy the whole code).");
+                throw new FormatException(BloodborneLauncher.Core.UiText.T("The settings are damaged (copy the whole code)."));
             }
             if (root["bbpc_settings"] is not JsonValue version || !version.TryGetValue<int>(out var v) || v != 1)
-                throw new FormatException("These are not Bloodborne PC settings, or they come from a newer launcher.");
+                throw new FormatException(BloodborneLauncher.Core.UiText.T("These are not Bloodborne PC settings, or they come from a newer launcher."));
 
             var ini = new SortedDictionary<string, string>(StringComparer.Ordinal);
             if (root["ini"] is JsonObject iniObject)
@@ -118,7 +118,7 @@ namespace BloodborneLauncher.Core
                          lv.TryGetValue<string>(out var ls) && ls.Length <= 256 && !ls.Any(char.IsControl)))
                         launcher[key] = lv.DeepClone();
             if (ini.Count == 0 && launcher.Count == 0)
-                throw new FormatException("These settings are empty.");
+                throw new FormatException(BloodborneLauncher.Core.UiText.T("These settings are empty."));
             var from = root["from"] is JsonValue f && f.TryGetValue<string>(out var label) && label.Length <= 40 ? label : "another launcher";
             return new Snapshot(ini, launcher, from);
         }
@@ -135,7 +135,7 @@ namespace BloodborneLauncher.Core
             }
             catch (FormatException)
             {
-                throw new FormatException("The code is damaged (copy the whole code).");
+                throw new FormatException(BloodborneLauncher.Core.UiText.T("The code is damaged (copy the whole code)."));
             }
             try
             {
@@ -146,12 +146,12 @@ namespace BloodborneLauncher.Core
                 while (read < buffer.Length && (n = deflate.Read(buffer, read, buffer.Length - read)) > 0)
                     read += n;
                 if (read > MaxChars)
-                    throw new FormatException("That code is far too large to be shared settings.");
+                    throw new FormatException(BloodborneLauncher.Core.UiText.T("That code is far too large to be shared settings."));
                 return Encoding.UTF8.GetString(buffer, 0, read);
             }
             catch (InvalidDataException)
             {
-                throw new FormatException("The code is damaged (copy the whole code).");
+                throw new FormatException(BloodborneLauncher.Core.UiText.T("The code is damaged (copy the whole code)."));
             }
         }
 

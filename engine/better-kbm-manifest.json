@@ -1,16 +1,20 @@
 {
   "integration": "better-kbm-expanded",
-  "version": 15,
+  "version": 16,
   "launcher_source_revision": "2d2664961f565f496a7cf9c5b3d1176e10fb0755",
   "engine_base_tag": "v0.4.0-darkizuku-preview.1",
   "files": {
+    "gpu/shadps4/video_core/renderer_vulkan/vk_temporal_upscaler.cpp": {
+      "before": "16cb520be9bd0fd26cc87d238dc428312e0dd6e77a35323d059cac3038b4b957",
+      "after": "1c2c3e759e4497a2c4dc8837245c7744b6bd221792ebf5a3f234443b6afc0ad0"
+    },
     "gpu/shim/bbport_settings.cpp": {
       "before": "285387eee0b9ed220f2fd427489c7d037729abc55e0954df7c8daaa0a78520e5",
-      "after": "c3392fa04dc91801f14d62d046ed4e94d4a7f2a6659e3c31a40b9108319f06eb"
+      "after": "c3f09edae696f466170c78787599053fe810c30c2f77076ef9bcd679c5b906c5"
     },
     "gpu/shim/bbport_settings.h": {
       "before": "1b135c412fb15c7707d3de21fab0a2ddd4e00c0a212100f6d9543011c047ea7a",
-      "after": "a710cb65282aeae5133f02acba6677c1548998cfe5d84b608dba7dbf097c1362"
+      "after": "f48da7e93018415577a5470ea9ddd68aab19244cee64c668a3554ae45f5eb30b"
     },
     "gpu/shim/engine/binding_pages.h": {
       "before": null,
@@ -146,7 +150,7 @@
     },
     "scripts/run_windows.py": {
       "before": "3e6612db1502c553b80f28375d3f598a576ff3cb29ed5a43dcada81b6a620f81",
-      "after": "6a11e2e4fe03e7f744c3c1f041348cd66d4b80c61747937e3b546d8300657e97"
+      "after": "045c3e36fc0fb6d62b3f120fc1c727c106d17bf9f639733f7c76feafbaf3efab"
     },
     "src/probe.c": {
       "before": "cef510dc60051fa806e812e88af708cc6e4155a0ad799da71f786b86b7197bda",
@@ -187,6 +191,10 @@
     "tests/test_pc_input.cpp": {
       "before": "fe3895f7348837e281a2da35075853fd438b5917fc2818f1073d57ac8cb89111",
       "after": "fc2be12cbf652e834c329594df133909d02b26c88548c9b7adf9111819284d88"
+    },
+    "tests/test_upscaler_support.cpp": {
+      "before": "94c21773b7927be9282213665434ef16559993d5cc979427c4416ffa73dd01ba",
+      "after": "d31f2cd58e9b83d88788bc9ddd22fb82e08533cfbb4ad9296e8dec453d51bdb4"
     },
     "tools/engine/menu_assets.cpp": {
       "before": "0291880f781970fb65b9c280e7387e667549d8561eff918493c57134a7390024",

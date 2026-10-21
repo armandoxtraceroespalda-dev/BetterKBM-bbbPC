@@ -1,7 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using BloodborneLauncher.Core;
-using Wpf.Ui.Controls;
+using BloodborneLauncher.Controls;
 using TextBlock = System.Windows.Controls.TextBlock;
 
 namespace BloodborneLauncher.Views
@@ -15,14 +15,14 @@ namespace BloodborneLauncher.Views
         private List<Mods.Entry> _mods = new();
         private List<(Patches.Patch Patch, bool On)> _patches = new();
 
-        public ModsPage() : base("Mods & patches",
-            "Extract each mod into its own folder (with dvdroot_ps4, or straight chr/, parts/ and so on). Applied when the game starts.")
+        public ModsPage() : base(BloodborneLauncher.Core.UiText.T("Mods & patches"),
+            BloodborneLauncher.Core.UiText.T("Extract each mod into its own folder (with dvdroot_ps4, or straight chr/, parts/ and so on). Applied when the game starts."))
         {
-            Group("Mods");
-            SettingToggle(SymbolRegular.PuzzlePiece24, "Load mods", "When two mods replace the same file, the one lower in the list wins",
+            Group(BloodborneLauncher.Core.UiText.T("Mods"));
+            SettingToggle(SymbolRegular.PuzzlePiece24, BloodborneLauncher.Core.UiText.T("Load mods"), BloodborneLauncher.Core.UiText.T("When two mods replace the same file, the one lower in the list wins"),
                 "mods_enabled");
-            Add(Card(SymbolRegular.Folder24, "Mods folder", "", Row(
-                SmallButton("Browse", SymbolRegular.FolderOpen24, (_, _) =>
+            Add(Card(SymbolRegular.Folder24, BloodborneLauncher.Core.UiText.T("Mods folder"), "", Row(
+                SmallButton(BloodborneLauncher.Core.UiText.T("Browse"), SymbolRegular.FolderOpen24, (_, _) =>
                 {
                     if (PickFolder("Mods folder", GameEnvironment.ModsDir(S)) is { } path)
                     {
@@ -31,16 +31,14 @@ namespace BloodborneLauncher.Views
                         RefreshMods();
                     }
                 }),
-                IconButton(SymbolRegular.Open24, "Open in Explorer", (_, _) => Paths.OpenFolder(GameEnvironment.ModsDir(S))),
-                IconButton(SymbolRegular.ArrowClockwise24, "Refresh the list", (_, _) => RefreshMods())), out _modsHint));
+                IconButton(SymbolRegular.Open24, BloodborneLauncher.Core.UiText.T("Open in Explorer"), (_, _) => Paths.OpenFolder(GameEnvironment.ModsDir(S))),
+                IconButton(SymbolRegular.ArrowClockwise24, BloodborneLauncher.Core.UiText.T("Refresh the list"), (_, _) => RefreshMods())), out _modsHint));
             Body.Children.Add(_modList);
 
-            Group("Third-party patches");
-            Body.Children.Add(Text("shadPS4-format XML patches for version 01.09 from the patches folder, and the port's built-in " +
-                                   "ones (Bloodborne.xml, off until you switch them on; frame rate, effects and resolution have their own " +
-                                   "settings). Put your own patches in a file of their own: Bloodborne.xml is replaced on every update.", "Faint"));
-            Add(Card(SymbolRegular.Folder24, "Patches folder", "", Row(
-                SmallButton("Browse", SymbolRegular.FolderOpen24, (_, _) =>
+            Group(BloodborneLauncher.Core.UiText.T("Third-party patches"));
+            Body.Children.Add(Text(BloodborneLauncher.Core.UiText.Format("shadPS4-format XML patches for version 01.09 from the patches folder, and the port\u0027s built-in ones (Bloodborne.xml, off until you switch them on; frame rate, effects and resolution have their own settings). Put your own patches in a file of their own: Bloodborne.xml is replaced on every update."), "Faint"));
+            Add(Card(SymbolRegular.Folder24, BloodborneLauncher.Core.UiText.T("Patches folder"), "", Row(
+                SmallButton(BloodborneLauncher.Core.UiText.T("Browse"), SymbolRegular.FolderOpen24, (_, _) =>
                 {
                     if (PickFolder("Patches folder", GameEnvironment.PatchesDir(S)) is { } path)
                     {
@@ -49,12 +47,13 @@ namespace BloodborneLauncher.Views
                         RefreshPatches();
                     }
                 }),
-                IconButton(SymbolRegular.Open24, "Open in Explorer", (_, _) => Paths.OpenFolder(GameEnvironment.PatchesDir(S))),
-                IconButton(SymbolRegular.ArrowClockwise24, "Refresh the list", (_, _) => RefreshPatches())), out _patchesHint));
+                IconButton(SymbolRegular.Open24, BloodborneLauncher.Core.UiText.T("Open in Explorer"), (_, _) => Paths.OpenFolder(GameEnvironment.PatchesDir(S))),
+                IconButton(SymbolRegular.ArrowClockwise24, BloodborneLauncher.Core.UiText.T("Refresh the list"), (_, _) => RefreshPatches())), out _patchesHint));
             Body.Children.Add(_patchList);
 
 
             Ws.PortChanged += OnShown;
+            ReleaseWhenDisposed(() => Ws.PortChanged -= OnShown);
         }
 
 
@@ -68,7 +67,7 @@ namespace BloodborneLauncher.Views
         {
             var dir = GameEnvironment.ModsDir(S);
             _mods = Mods.Load(dir);
-            SetHint(_modsHint, _mods.Count == 0 ? $"{dir} — no mods" : $"{dir} — {_mods.Count} mod{(_mods.Count == 1 ? "" : "s")}");
+            SetHint(_modsHint, _mods.Count == 0 ? BloodborneLauncher.Core.UiText.F($"{dir} — no mods") : BloodborneLauncher.Core.UiText.F($"{dir} — {_mods.Count} mod{(_mods.Count == 1 ? "" : "s")}"));
             DrawMods();
         }
 
@@ -85,12 +84,12 @@ namespace BloodborneLauncher.Views
                     _mods[index] = mod with { Enabled = toggle.IsChecked == true };
                     SaveMods();
                 };
-                var up = IconButton(SymbolRegular.ArrowUp24, "Load earlier", (_, _) => Move(index, -1));
-                var down = IconButton(SymbolRegular.ArrowDown24, "Load later", (_, _) => Move(index, 1));
+                var up = IconButton(SymbolRegular.ArrowUp24, BloodborneLauncher.Core.UiText.T("Load earlier"), (_, _) => Move(index, -1));
+                var down = IconButton(SymbolRegular.ArrowDown24, BloodborneLauncher.Core.UiText.T("Load later"), (_, _) => Move(index, 1));
                 up.IsEnabled = i > 0;
                 down.IsEnabled = i < _mods.Count - 1;
 
-                var card = Card(SymbolRegular.Box24, mod.Name, $"Load order {i + 1}", Row(up, down, toggle), out _);
+                var card = Card(SymbolRegular.Box24, BloodborneLauncher.Core.UiText.T(mod.Name), BloodborneLauncher.Core.UiText.F($"Load order {i + 1}"), Row(up, down, toggle), out _);
                 card.Margin = new Thickness(24, 0, 0, 4);
                 _modList.Children.Add(card);
             }
@@ -113,7 +112,7 @@ namespace BloodborneLauncher.Views
             }
             catch (Exception e)
             {
-                Ws.Log("Could not save mods.json: " + e.Message, LogLevel.Bad);
+                Ws.Log(BloodborneLauncher.Core.UiText.Format("Could not save mods.json: {0}",e.Message), LogLevel.Bad);
             }
         }
 
@@ -122,7 +121,7 @@ namespace BloodborneLauncher.Views
             var dir = GameEnvironment.PatchesDir(S);
             var profile = Patches.LoadProfile();
             _patches = Patches.Discover(dir).Select(p => (p, Patches.IsOn(p, profile))).ToList();
-            SetHint(_patchesHint, _patches.Count == 0 ? $"{dir} — no patches" : dir);
+            SetHint(_patchesHint, _patches.Count == 0 ? BloodborneLauncher.Core.UiText.F($"{dir} — no patches") : BloodborneLauncher.Core.UiText.T(dir));
 
             _patchList.Children.Clear();
             for (var i = 0; i < _patches.Count; i++)
@@ -139,14 +138,14 @@ namespace BloodborneLauncher.Views
                     }
                     catch (Exception e)
                     {
-                        Ws.Log("Could not save patches.json: " + e.Message, LogLevel.Bad);
+                        Ws.Log(BloodborneLauncher.Core.UiText.Format("Could not save patches.json: {0}",e.Message), LogLevel.Bad);
                     }
                 };
                 var hint = patch.File + (patch.Author.Length > 0 ? $" · by {patch.Author}" : "");
-                var card = Card(SymbolRegular.DocumentText24, patch.Name, hint, toggle, out _);
+                var card = Card(SymbolRegular.DocumentText24, BloodborneLauncher.Core.UiText.T(patch.Name), BloodborneLauncher.Core.UiText.T(hint), toggle, out _);
                 card.Margin = new Thickness(24, 0, 0, 4);
                 if (patch.Note.Length > 0)
-                    card.ToolTip = patch.Note;
+                    card.ToolTip = BloodborneLauncher.Core.UiText.T(patch.Note);
                 _patchList.Children.Add(card);
             }
         }

@@ -6,7 +6,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using BloodborneLauncher.Core;
-using Wpf.Ui.Controls;
+using BloodborneLauncher.Controls;
 using TextBlock = System.Windows.Controls.TextBlock;
 
 namespace BloodborneLauncher.Views
@@ -98,7 +98,7 @@ namespace BloodborneLauncher.Views
             };
             var name = new TextBlock
             {
-                Text = trophy.Name,
+                Text = BloodborneLauncher.Core.UiText.T(trophy.Name),
                 FontFamily = face,
                 FontSize = 17,
                 Foreground = new SolidColorBrush(Color.FromRgb(0xF4, 0xF4, 0xF4)),
@@ -112,7 +112,7 @@ namespace BloodborneLauncher.Views
 
             var earned = new TextBlock
             {
-                Text = "You have earned a trophy!",
+                Text = BloodborneLauncher.Core.UiText.T("You have earned a trophy!"),
                 FontFamily = face,
                 FontSize = 13.5,
                 Foreground = new SolidColorBrush(Color.FromRgb(0xC9, 0xCB, 0xCF)),

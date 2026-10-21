@@ -14,17 +14,35 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <RuntimeHostConfigurationOption Include="System.GC.ConserveMemory" Value="7" />
+    <!-- Legacy periodic/input policies stay excluded; UI32 has one pressure-gated post-navigation path. -->
+    <Compile Remove="Core/InteractionHeapReclaimer.cs;Core/IdleHeapReclaimer.cs;Core/IdleMemoryReclaimer.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- The source fingerprint the builder writes beside the exe; shared so both agree on it. -->
     <Compile Include="..\Shared\SourceStamp.cs" Link="Core\SourceStamp.cs" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\VGAudio.Atrac9\VGAudio.Atrac9.csproj" />
     <Resource Include="app.ico" />
-    <Resource Include="Assets\backdrop.jpg" />
+    <EmbeddedResource Include="Localization/*.json" />
+    <EmbeddedResource Include="Fonts/LauncherFallback.otf" LogicalName="BloodborneLauncher.Fonts.LauncherFallback.otf" />
+    <Content Include="Fonts/OFL.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <Page Remove="Themes\Charcoal.xaml;Themes\Glass.xaml" />
+    <Content Include="ThirdPartyNotices\VGAudio.txt" CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <Content Include="Assets\MenuSounds.txt" Link="gui\sounds\README.txt"
+             TargetPath="gui\sounds\README.txt" CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <Content Include="gui\*.ttf;gui\*.otf;gui\*.png"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="WPF-UI" Version="4.3.0" />
+    <PackageReference Include="BCnEncoder.Net" Version="2.3.0" />
+
   </ItemGroup>
 
 </Project>

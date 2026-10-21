@@ -1,0 +1,18 @@
+Original Bloodborne launcher sounds
+
+The launcher extracts these effects locally from dvdroot_ps4/sound/sprj_main*.fsb:
+hover.wav: CURSOL_MOVE (hover)
+confirm.wav: menu_open (soft menu-opening confirmation)
+change.wav: CURSOL_SELECT (selector, on/off switch and slider change)
+start.wav: GAMESTART (main Play action)
+
+Audio plays at 25% PCM amplitude. Cached WAVs retain their original samples;
+Windows and game volume remain unchanged. The speaker button in the lower-right
+corner toggles launcher sound and remembers the setting across launches.
+Window caption buttons and the speaker button are silent.
+
+Valid custom clips are preserved. The old select.wav is left untouched but is
+no longer played; confirm.wav is extracted automatically during the next launch.
+Missing banks leave optional audio silent without blocking the launcher.
+No original game audio is redistributed. Decoding runs in an isolated worker;
+a complete cache skips extraction on subsequent starts.

@@ -3,7 +3,7 @@ namespace BloodborneLauncher.Core;
 
 public static class GameLanguages {
     // Keep the previous selection for both channels until the user changes either one.
-    // The legacy language key now owns voices; text_language owns all game text.
+    // The legacy language key now owns voices; text_language owns game text and the launcher interface.
     public static void Ensure(LauncherSettings settings) {
         if (settings.Str("text_language").Length == 0)
             settings.Set("text_language", ValidText(settings.Str("language")));

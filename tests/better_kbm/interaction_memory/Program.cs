@@ -1,0 +1,34 @@
+using BloodborneLauncher.Core;
+using System.Runtime.CompilerServices;
+const long MiB=1024*1024;
+static void Check(bool ok,string why){if(!ok)throw new Exception(why);}
+var policy=new InteractionHeapReclaimer();policy.Reset(4*MiB,0);
+long allocated=GC.GetAllocatedBytesForCurrentThread();
+for(int i=0;i<1000000;i++)policy.NoteInteraction(i);
+Check(GC.GetAllocatedBytesForCurrentThread()-allocated<256,"Pointer notifications must not allocate per movement.");
+Check(policy.DelayBeforeRelease(1000000,false,4*MiB+128000,5*MiB,256000)>0,"Tiny input allocations must not force a collection.");
+Check(policy.DelayBeforeRelease(1002000,false,4*MiB+128000,5*MiB,256000)==-1,"A quiet low-allocation burst ends; periodic maintenance can restart it independently.");
+policy.Reset(4*MiB,0);policy.BeginMaintenance();
+Check(policy.DelayBeforeRelease(0,false,5*MiB,6*MiB,2*MiB)==0,"Idle allocations must be reclaimed without pointer or navigation events.");
+policy.Reset(4*MiB,0);policy.NoteInteraction(0);policy.NoteInteraction(100);
+Check(policy.DelayBeforeRelease(100,false,5*MiB,6*MiB,2*MiB)==125,"Prefer a very short pointer pause.");
+policy.NoteInteraction(500);
+Check(policy.DelayBeforeRelease(500,false,5*MiB,6*MiB,2*MiB)==0,"Continuous motion must not postpone reclamation beyond the short burst limit.");
+Check(policy.DelayBeforeRelease(500,true,5*MiB,6*MiB,2*MiB)>0,"Captures, drags and modals must remain protected.");
+policy.Released(500,16*MiB,5*MiB,4*MiB,2*MiB);policy.BeginMaintenance();
+Check(policy.DelayBeforeRelease(1000,false,5*MiB,6*MiB,4*MiB)==500,"Useful releases use a short bounded cooldown.");
+Check(policy.DelayBeforeRelease(1500,false,5*MiB,6*MiB,4*MiB)==0,"Continued allocations are checked again promptly.");
+policy.Released(1500,6*MiB,6*MiB,4*MiB,4*MiB);policy.BeginMaintenance();
+Check(policy.DelayBeforeRelease(2000,false,5*MiB,6*MiB,6*MiB)==1500,"No-progress backoff stays bounded instead of leaving 30 seconds of accumulation.");
+policy.Cancel();Check(policy.DelayBeforeRelease(10000,false,30*MiB,70*MiB,100*MiB)==-1,"Cancel must stop work during navigation or close.");
+policy.Reset(20*MiB,100*MiB);policy.BeginMaintenance();
+Check(policy.DelayBeforeRelease(10000,false,20*MiB+128000,21*MiB,100*MiB+256000)==-1,"An active page's size alone must not cause collection.");
+Check(!InteractionHeapReclaimer.HasPressure(4*MiB+128000,5*MiB,256000,4*MiB,0),"A few events do not justify full collection.");
+Check(InteractionHeapReclaimer.HasPressure(4*MiB,8*MiB,0,4*MiB,0),"Free committed GC space is handled without interaction.");
+var live=new byte[4*MiB];live[0]=17;live[^1]=29;
+var retired=MakeGarbage();long before=GC.GetTotalMemory(false),commit=GC.GetGCMemoryInfo().TotalCommittedBytes;
+var result=IdleHeapReclaimer.Release(commit,before);
+Check(!retired.TryGetTarget(out _),"Periodic cleanup must collect discarded buffers.");
+Check(live[0]==17&&live[^1]==29,"Active page/settings data must survive.");GC.KeepAlive(live);
+Console.WriteLine($"PASS: allocation-free input, idle maintenance, lower pressure thresholds, bounded continuous motion, capture protection, short cooldown/backoff, cancellation and live data. Managed {before/MiB} -> {result.ManagedAfter/MiB} MiB (synthetic fixture, not Windows launcher RAM).");
+[MethodImpl(MethodImplOptions.NoInlining)] static WeakReference<byte[]> MakeGarbage(){var buffers=new byte[24][];for(int i=0;i<buffers.Length;i++){buffers[i]=new byte[MiB];buffers[i][0]=1;}return new(buffers[^1]);}

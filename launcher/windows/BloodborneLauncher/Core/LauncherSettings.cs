@@ -19,6 +19,7 @@ namespace BloodborneLauncher.Core
         private static Dictionary<string, JsonNode?> Defaults() => new()
         {
             ["ui_language"] = "en",
+            ["menu_sound_muted"] = false,
             ["game_dir"] = "",
             ["user_dir"] = "",
             ["dlc_dir"] = "",

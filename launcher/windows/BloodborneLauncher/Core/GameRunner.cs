@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 
@@ -85,6 +85,7 @@ namespace BloodborneLauncher.Core
                 process.BeginErrorReadLine();
                 _process = process;
                 StartedAt = DateTime.Now;
+                _ = TrackGameIconAsync(process);
                 return null;
             }
             catch (Exception e)
@@ -93,6 +94,15 @@ namespace BloodborneLauncher.Core
                 CloseLog();
                 return "Could not start: " + e.Message;
             }
+        }
+
+        private static async Task TrackGameIconAsync(Process process)
+        {
+            using var cancel = new CancellationTokenSource();
+            var watcher = GameWindowIcon.WatchAsync(process, Path.Combine(MenuAssets.DirectoryPath, "game-icon.ico"), cancel.Token);
+            try { await process.WaitForExitAsync().ConfigureAwait(false); }
+            catch (InvalidOperationException) { /* The process has already exited. */ }
+            finally { cancel.Cancel(); await watcher.ConfigureAwait(false); }
         }
 
         private void OpenLog()

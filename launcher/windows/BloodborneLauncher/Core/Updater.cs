@@ -238,7 +238,7 @@ namespace BloodborneLauncher.Core
         /// optional ones: see <see cref="Optional"/>).</summary>
         public static async Task<IReadOnlyList<string>> InstallAsync(Release release, bool package, IProgress<double>? progress = null)
         {
-            var self = Environment.ProcessPath ?? throw new InvalidOperationException("Cannot tell where this launcher is.");
+            var self = Environment.ProcessPath ?? throw new InvalidOperationException(BloodborneLauncher.Core.UiText.T("Cannot tell where this launcher is."));
             var folder = Path.GetDirectoryName(self)!;
             // A folder of its own each time: one an antivirus still holds a file in (from an earlier
             // attempt) cannot be deleted, and must not stop this one.
@@ -257,22 +257,22 @@ namespace BloodborneLauncher.Core
             if (package)
             {
                 if (Process.GetProcessesByName("bb-probe").Length > 0)
-                    throw new InvalidOperationException("Close the game first: the update replaces the engine.");
+                    throw new InvalidOperationException(BloodborneLauncher.Core.UiText.T("Close the game first: the update replaces the engine."));
                 var zip = Path.Combine(work, "package.zip");
                 await DownloadAsync(release.ZipUrl!, zip, release.ZipSize, progress);
                 var unpacked = Path.Combine(work, "unpacked");
                 Extract(zip, unpacked, skipped);
                 var root = Directory.GetFiles(unpacked, ExeName, SearchOption.AllDirectories).Select(Path.GetDirectoryName).FirstOrDefault()
-                           ?? throw new InvalidOperationException($"The package has no {ExeName}.");
+                           ?? throw new InvalidOperationException(BloodborneLauncher.Core.UiText.F($"The package has no {ExeName}."));
                 CopyPackage(root!, folder, self, skipped);
             }
             else
             {
-                var url = release.ExeUrl ?? throw new InvalidOperationException("This release has no launcher download attached.");
+                var url = release.ExeUrl ?? throw new InvalidOperationException(BloodborneLauncher.Core.UiText.T("This release has no launcher download attached."));
                 var exe = Path.Combine(work, ExeName);
                 await DownloadAsync(url, exe, release.ExeSize, progress);
                 if (new FileInfo(exe).Length < 100_000)
-                    throw new InvalidOperationException("The download is too small to be the launcher.");
+                    throw new InvalidOperationException(BloodborneLauncher.Core.UiText.T("The download is too small to be the launcher."));
                 ReplaceSelf(self, exe);
             }
             Process.Start(new ProcessStartInfo(self) { UseShellExecute = true, WorkingDirectory = folder });
@@ -303,8 +303,7 @@ namespace BloodborneLauncher.Core
         }
 
         private static Exception Blocked(string file, Exception e) => new InvalidOperationException(
-            $"{e.Message}\n\nAn antivirus is most likely holding or removing {Path.GetFileName(file)}. Allow it (or the " +
-            "Bloodborne PC folder) in the antivirus and update again.", e);
+            BloodborneLauncher.Core.UiText.Format("{0}Bloodborne PC folder) in the antivirus and update again.",$"{e.Message}\n\nAn antivirus is most likely holding or removing {Path.GetFileName(file)}. Allow it (or the "), e);
 
         private static void Extract(string zip, string to, List<string> skipped)
         {

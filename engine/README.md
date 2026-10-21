@@ -101,3 +101,14 @@ no longer includes. The result is `out/bb-probe.exe`; the package's `out/` holds
 CLANG64 DLLs it loads.
 
 GPL-3.0-or-later, like the engine.
+
+## UI24 / integration 16: live output policy
+
+`better-kbm-resolution-update.patch` upgrades the preceding integration without
+resetting bbport.ini. The Windows runner resolves live_resolution for every
+startup, including 1080p/TAA, and exports BB_LIVE_RES=0|1. The renderer uses the
+startup output while disabled, keeps menu selections pending in the INI, and
+reports restart requirements. Explicit BB_LIVE_RES overrides remain supported.
+Changing this setting takes effect on the next game launch. This upgrade changes
+native settings/renderer code: rebuild with tools/build-better-kbm.sh, not only
+the launcher publisher. Native GUI/audio assets and user settings remain local.

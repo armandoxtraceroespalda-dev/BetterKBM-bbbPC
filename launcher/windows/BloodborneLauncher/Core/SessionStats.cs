@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace BloodborneLauncher.Core
@@ -51,7 +51,7 @@ namespace BloodborneLauncher.Core
         /// <summary>"1 h 12 min · 112 FPS average (lowest 98) · worst frame 107 ms · 3 stutters".</summary>
         public string Summary =>
             Duration(Length) + (HasFrameStats
-                ? $" · {AverageFps:0} FPS average (lowest {LowestFps:0}) · worst frame {WorstFrameMs:0} ms · " +
+                ? BloodborneLauncher.Core.UiText.F($" · {AverageFps:0} FPS average (lowest {LowestFps:0}) · worst frame {WorstFrameMs:0} ms · ") +
                   (Stutters == 1 ? "1 stutter" : $"{Stutters} stutters")
                 : " · turn on Frame statistics (More › Advanced) for FPS and stutters") +
             (RamEndMiB > 0 ? $" · RAM {RamStartMiB / 1024.0:0.0} → {RamEndMiB / 1024.0:0.0} GB" : "");

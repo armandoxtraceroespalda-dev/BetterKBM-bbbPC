@@ -1,9 +1,15 @@
-﻿namespace BloodborneLauncher.Core
+namespace BloodborneLauncher.Core
 {
     /// <summary>A drop-down entry. Note is shown under the row while this entry is selected.</summary>
-    public sealed record Choice(string Label, string Value, string? Note = null);
+    public sealed record Choice(string SourceLabel, string Value, string? SourceNote = null, bool TranslateLabel = true)
+    {
+        public string Label => TranslateLabel ? UiText.T(SourceLabel) : SourceLabel;
+        public string? Note => SourceNote == null ? null : UiText.T(SourceNote);
+        // Device identities and language endonyms are data, not interface messages.
+        public static Choice Literal(string label, string value) => new(label, value, TranslateLabel: false);
+    }
 
-    public sealed record Effect(string Key, string Title, bool Default, string? Hint = null);
+    public sealed record Effect(string Key, string SourceTitle, bool Default, string? SourceHint = null) { public string Title=>BloodborneLauncher.Core.UiText.T(SourceTitle);public string? Hint=>SourceHint==null?null:BloodborneLauncher.Core.UiText.T(SourceHint); }
 
     /// <summary>Every list the launcher offers, in English, with the values bbport expects.</summary>
     public static class Choices
@@ -128,15 +134,15 @@
 
         public static readonly Choice[] GameLanguages =
         {
-            new("English", "1"),
-            new("Russian", "8"),
-            new("Japanese", "0"),
-            new("French", "2"),
-            new("Spanish (Spain)", "3"),
-            new("Spanish (Latin America)", "20"),
-            new("German", "4"),
-            new("Italian", "5"),
-            new("Português (Brasil)", "17"),
+            Choice.Literal("English", "1"),
+            Choice.Literal("Русский", "8"),
+            Choice.Literal("日本語", "0"),
+            Choice.Literal("Français", "2"),
+            Choice.Literal("Español (España)", "3"),
+            Choice.Literal("Español (América)", "20"),
+            Choice.Literal("Deutsch", "4"),
+            Choice.Literal("Italiano", "5"),
+            Choice.Literal("Português (Brasil)", "17"),
         };
 
         // Russian text is supported, but the game has no Russian voice track.

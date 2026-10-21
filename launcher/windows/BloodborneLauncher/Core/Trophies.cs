@@ -118,9 +118,14 @@ namespace BloodborneLauncher.Core
             _logStamp = Stamp(LogPath);
             try
             {
-                var run = File.Exists(RunLogPath) ? File.ReadAllBytes(RunLogPath) : Array.Empty<byte>();
-                _runOffset = run.Length;
-                _runTail = run[Math.Max(0, run.Length - 64)..];
+                if(File.Exists(RunLogPath))
+                {
+                    using var run=new FileStream(RunLogPath,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete);
+                    _runOffset=run.Length;
+                    _runTail=new byte[(int)Math.Min(64,_runOffset)];
+                    run.Seek(_runOffset-_runTail.Length,SeekOrigin.Begin);run.ReadExactly(_runTail);
+                }
+                else { _runOffset=0;_runTail=Array.Empty<byte>(); }
                 _runStamp = Stamp(RunLogPath);
             }
             catch
@@ -234,24 +239,21 @@ namespace BloodborneLauncher.Core
                     _runOffset = 0;
 
                 stream.Seek(_runOffset, SeekOrigin.Begin);
-                using var memory = new MemoryStream();
-                stream.CopyTo(memory);
-                var chunk = memory.ToArray();
-                // Only whole lines: the rest is read again once the game has written it.
-                var end = Array.LastIndexOf(chunk, (byte)'\n') + 1;
-                if (end == 0) return new List<int>();
-                _runOffset += end;
-                _runTail = chunk[Math.Max(0, end - 64)..end];
-
-                var text = Encoding.UTF8.GetString(chunk, 0, end);
+                var saved=new HashSet<int>();var ids=new HashSet<int>();
+                long complete=StreamScan.CompleteLines(stream,line => {
+                    foreach(Match match in SaveLine.Matches(line))
+                        if(int.TryParse(match.Groups[1].Value,out int id))saved.Add(id);
+                    foreach(Match match in UnlockLine.Matches(line))
+                        if(int.TryParse(match.Groups[1].Value,out int id))ids.Add(id);
+                });
+                if(complete==_runOffset)return new List<int>();
+                _runOffset=complete;
+                _runTail=new byte[(int)Math.Min(64,complete)];
+                stream.Seek(complete-_runTail.Length,SeekOrigin.Begin);stream.ReadExactly(_runTail);
                 var when = new DateTimeOffset(stamp.Value.Item2).ToUnixTimeSeconds();
                 var found = new List<int>();
-                // Trophies a save already had: recorded without a notification each; only a
-                // platinum they complete is announced.
-                var saved = SaveLine.Matches(text).Select(m => int.Parse(m.Groups[1].Value)).ToList();
-                if (saved.Count > 0) found.AddRange(Record(saved, when).Where(id => id == PlatinumId));
-                var ids = UnlockLine.Matches(text).Select(m => int.Parse(m.Groups[1].Value)).ToList();
-                if (ids.Count > 0) found.AddRange(Record(ids, when));
+                if(saved.Count>0)found.AddRange(Record(saved,when).Where(id=>id==PlatinumId));
+                if(ids.Count>0)found.AddRange(Record(ids,when));
                 return found;
             }
             catch
@@ -305,8 +307,8 @@ namespace BloodborneLauncher.Core
             try
             {
                 var needle = Encoding.ASCII.GetBytes("trophy %d unlocked");
-                var bytes = File.ReadAllBytes(probe);
-                return bytes.AsSpan().IndexOf(needle) >= 0;
+                using var stream=new FileStream(probe,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete);
+                return StreamScan.Contains(stream,needle);
             }
             catch
             {

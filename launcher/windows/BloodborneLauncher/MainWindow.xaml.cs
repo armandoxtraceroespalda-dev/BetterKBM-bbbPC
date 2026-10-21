@@ -1,11 +1,10 @@
-﻿using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using BloodborneLauncher.Core;
 using BloodborneLauncher.Views;
-using Wpf.Ui.Controls;
+using BloodborneLauncher.Controls;
 using MessageBoxButton = System.Windows.MessageBoxButton;
 using MessageBoxResult = System.Windows.MessageBoxResult;
 
@@ -13,29 +12,36 @@ namespace BloodborneLauncher
 {
     public partial class MainWindow
     {
-        private readonly ObservableCollection<LogItem> _log = new();
-        private readonly Dictionary<Type, LauncherPage> _pages = new();
-        private bool _logExpanded;
+        private readonly PageCache<Type, LauncherPage> _pages = new(1, page => page.Dispose());
         private bool _closing;
 
         public static MainWindow? Instance => Application.Current.MainWindow as MainWindow;
 
         public MainWindow()
         {
-            InitializeComponent();
+            using (LauncherDiagnostics.Measure("Main window XAML")) InitializeComponent();
+            SetWindowChrome();
+            _navigationMemory=new NavigationMemoryCoordinator(this,()=>_navigationInProgress || Mouse.Captured!=null ||
+                !IsEnabled || PageFrame.Content is ControlsPage {IsCapturingInput:true});
+            SourceInitialized+=(_,_)=>{_backdropReady=true;RefreshBackdrop();};
+            SizeChanged+=(_,_)=>{if(_backdropReady)RefreshBackdrop();};
+            DpiChanged+=(_,_)=>RefreshBackdrop();
 
-            LogList.ItemsSource = _log;
-            var ws = Workspace.Current;
-            ws.Logged += OnLogged;
-            ws.Saved += () => SavedText.Text = $"Saved {DateTime.Now:HH:mm:ss}";
+            Workspace ws;
+            using (LauncherDiagnostics.Measure("Shared workspace creation")) ws = Workspace.Current;
+            ws.Logged += LauncherDiagnostics.Record;
             ws.GameStateChanged += UpdatePlayButton;
             ws.GameCrashed += OnGameCrashed;
-            ws.Initialise();
+            using (LauncherDiagnostics.Measure("Workspace initialization")) ws.Initialise();
+            MenuSounds.Attach(this);
+            UpdateAudioToggle();
 
-            // Layout, read once at start (Settings › Layout restarts the launcher to switch).
+            // One presentation: retain the existing preference key for source compatibility.
             var args = Environment.GetCommandLineArgs();
-            var forced = Array.IndexOf(args, "--layout") is var at and >= 0 && at + 1 < args.Length ? args[at + 1] : null;
-            SettingRow.Classic = (forced ?? ws.Settings.Str("ui_layout")) == "classic";
+            ws.Settings.Set("ui_layout", "bloodborne");
+            ApplyBloodborne();
+            using (LauncherDiagnostics.Measure("Sidebar construction")) BuildSidebar();
+            SizeChanged+=(_,_)=>ScaleSidebar();
             if (Array.IndexOf(args, "--test-prompt") is var shot and >= 0 && shot + 1 < args.Length)
             {
                 Prompt.SnapshotPath = args[shot + 1];
@@ -48,25 +54,25 @@ namespace BloodborneLauncher
             // --play (Bloodborne.exe): the game straight away with the saved settings, the launcher
             // out of sight meanwhile (minimized, then hidden: its prompts show on their own, in the
             // middle of the screen, and it has no taskbar button to close the game by).
-            _directPlay = args.Contains("--play");
+            _directPlay = args.Contains("--play") && !RenderAudit.Enabled;
             if (_directPlay)
                 WindowState = WindowState.Minimized;
-            Sidebar.Visibility = SettingRow.Classic ? Visibility.Visible : Visibility.Collapsed;
-            TabStrip.Visibility = SettingRow.Classic ? Visibility.Collapsed : Visibility.Visible;
-            if (!SettingRow.Classic)
-                ApplyGlass();
 
-            var version = typeof(MainWindow).Assembly.GetName().Version;
-            VersionText.Text = version == null ? "" : Updater.CurrentLabel;
 
+// No update notification or release download is active in this fork.
+#if false // Intentionally disabled; retained as upstream reference.
             ws.UpdateStateChanged += () =>
             {
                 TitleUpdate.Visibility = ws.Update != null ? Visibility.Visible : Visibility.Collapsed;
                 if (ws.Update != null) TitleUpdateText.Text = $"Update {ws.Update.Tag}";
             };
 
+#endif
+
             Loaded += async (_, _) =>
             {
+// Do not initialize release checks, channels or update cleanup at startup.
+#if false // Intentionally disabled; retained as upstream reference.
                 Updater.CleanUp();
                 // Running a beta means choosing beta: kept after updating to a stable release.
                 if (Updater.CurrentBeta > 0 && ws.Settings.Str("update_channel").Length == 0)
@@ -76,8 +82,11 @@ namespace BloodborneLauncher
                 }
                 if (ws.Settings.Bool("check_updates"))
                     _ = ws.CheckForUpdatesAsync(quiet: true);
+#endif
+
                 await Task.Yield();
-                (SettingRow.Classic ? ClassicPlay : PlayItem).IsChecked = true;
+                GoHome();
+
                 UpdatePlayButton();
                 // --test-trophy: a sample notification, to check how it looks over the game.
                 if (Environment.GetCommandLineArgs().Contains("--test-trophy"))
@@ -85,25 +94,67 @@ namespace BloodborneLauncher
                 // --test-prompt <png>: a picture of a sample dialog over the launcher, drawn off-screen.
                 // --test-import: the import dialog with a long pasted code instead.
                 if (Prompt.SnapshotPath != null && Environment.GetCommandLineArgs().Contains("--test-import"))
-                    Dispatcher.BeginInvoke(() => Prompt.Ask("Import settings", $"Paste the code someone shared (it starts with {SharedSettings.CodePrefix}).",
-                            new Prompt.Field("Code", SharedSettings.ToCode(SharedSettings.Take(ws.Ini, ws.Settings)), "", Multiline: true)),
+                    Dispatcher.BeginInvoke(() => Prompt.Ask(BloodborneLauncher.Core.UiText.T("Import settings"), BloodborneLauncher.Core.UiText.F($"Paste the code someone shared (it starts with {SharedSettings.CodePrefix})."),
+                            new Prompt.Field(BloodborneLauncher.Core.UiText.T("Code"), SharedSettings.ToCode(SharedSettings.Take(ws.Ini, ws.Settings)), "", Multiline: true)),
                         System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                 else if (Prompt.SnapshotPath != null)
-                    Dispatcher.BeginInvoke(() => Prompt.Confirm("Switch layout", "The launcher restarts to change its layout.", "Restart now"),
+                    Dispatcher.BeginInvoke(() => Prompt.Confirm(BloodborneLauncher.Core.UiText.T("Switch layout"), BloodborneLauncher.Core.UiText.T("The launcher restarts to change its layout."), BloodborneLauncher.Core.UiText.T("Restart now")),
                         System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                 ws.Log(Paths.IsPortDir(Paths.PortDir)
-                        ? $"Bloodborne Launcher ready. Engine: {Paths.PortDir}"
-                        : "Bloodborne Launcher ready. Choose the engine folder in Settings.",
+                        ? BloodborneLauncher.Core.UiText.F($"Bloodborne Launcher ready. Engine: {Paths.PortDir}")
+                        : BloodborneLauncher.Core.UiText.T("Bloodborne Launcher ready. Choose the engine folder in Settings."),
                     Paths.IsPortDir(Paths.PortDir) ? LogLevel.Good : LogLevel.Warn);
                 // Once: the settings that suit this PC, shown before anything changes.
                 if (_directPlay)
                     _ = Dispatcher.BeginInvoke(async () => await PlayDirectAsync(), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
-                else if (!ws.Settings.Bool("hardware_offered") && Prompt.SnapshotPath == null && Paths.IsPortDir(Paths.PortDir))
+                else if (!RenderAudit.Enabled && !RetentionAudit.Enabled && !ws.Settings.Bool("hardware_offered") && Prompt.SnapshotPath == null && Paths.IsPortDir(Paths.PortDir))
                     _ = Dispatcher.BeginInvoke(() => OfferBestSettings(firstRun: true), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+            };
+            // Pointer input has no cleanup hooks; only settled navigation can queue a bounded attempt.
+            ContentRendered+=FirstContentRendered;
+            Closed += (_, _) => {
+                _closed=true;
+                _shownRefresh?.Abort(); _shownRefresh=null;
+                _navigationCancel?.Cancel(); _navigationCancel?.Dispose(); _navigationCancel=null;
+                MenuTransition.Reset(PageFrame);
+                _retentionAudit?.Dispose(); _retentionAudit=null;
+                _navigationMemory.Dispose();
+                ws.GameStateChanged-=UpdatePlayButton;
+                ws.GameCrashed-=OnGameCrashed;
+                ws.Logged-=LauncherDiagnostics.Record;
+                try { _pages.Clear(); }
+                finally { PageFrame.Content=null;BackdropImage.Source=null; }
             };
             Closing += OnClosing;
         }
 
+        private void FirstContentRendered(object? sender,EventArgs args)
+        {
+            ContentRendered-=FirstContentRendered;
+            _retentionAudit=RetentionAudit.Start(this,()=>PageFrame.Content?.GetType().Name??"none",()=>_pages.Count);
+            RenderAudit.Start(this);
+            LauncherDiagnostics.Memory("First content rendered");
+            LauncherDiagnostics.Record(BloodborneLauncher.Core.UiText.F($"Wallpaper viewport: source={BackdropImage.Source!=null}; visible={BackdropImage.IsVisible}; render tier={RenderCapability.Tier >> 16}; size={BackdropImage.ActualWidth:0}x{BackdropImage.ActualHeight:0}; opacity={BackdropImage.Opacity:0.00}; shade={((BackdropShade.Fill as SolidColorBrush)?.Color.A ?? 0)/255.0:0.00}; settings shade={SettingsShade.Visibility}"),LogLevel.Info);
+        }
+
+        private static readonly Brush HomeShade = FrozenShade(38), PageShade = FrozenShade(140);
+        private static Brush FrozenShade(byte alpha)
+        {
+            var brush = new SolidColorBrush(Color.FromArgb(alpha, 0, 0, 0)); brush.Freeze(); return brush;
+        }
+        private void AudioToggle_Click(object sender, RoutedEventArgs args)
+        {
+            MenuSounds.SetMuted(!MenuSounds.Muted);
+            Workspace.Current.Settings.Set("menu_sound_muted", MenuSounds.Muted);
+            Workspace.Current.SaveSoon(); UpdateAudioToggle();
+        }
+        private void UpdateAudioToggle()
+        {
+            AudioMutedMark.Visibility = MenuSounds.Muted ? Visibility.Visible : Visibility.Collapsed;
+            AudioWaves.Visibility = MenuSounds.Muted ? Visibility.Collapsed : Visibility.Visible;
+            AudioToggle.ToolTip=BloodborneLauncher.Core.UiText.T(MenuSounds.Muted?"Enable launcher sounds":"Mute launcher sounds");
+            System.Windows.Automation.AutomationProperties.SetName(AudioToggle, (string)AudioToggle.ToolTip);
+        }
         private bool _directPlay, _directCrashed;
 
         /// <summary>--play: starts the game; the launcher closes when it ends normally, and opens when
@@ -144,117 +195,116 @@ namespace BloodborneLauncher
             var ws = Workspace.Current;
             ws.Settings.Set("hardware_offered", true);
             ws.SaveSoon();
-            var hw = Hardware.Detect();
-            var changes = hw.Recommend(ws.Settings, ws.Ini);
+            Hardware hw;
+            using (LauncherDiagnostics.Measure("Hardware detection")) hw = Hardware.Detect();
+            var changes = hw.Recommend(ws.Settings, ws.Ini, out var upscaler);
+            var upscalerInfo = $"{PcText.Get("Recommended upscaler")}: {upscaler.Label}\n{PcText.Get(upscaler.Reason)}";
             if (changes.Count == 0)
             {
-                if (!firstRun) Prompt.Tell("Best settings for this PC", $"{hw.Summary}\n\nYour settings already suit this PC.");
+                if (!firstRun) Prompt.Tell(BloodborneLauncher.Core.UiText.T("Best settings for this PC"), BloodborneLauncher.Core.UiText.F($"{hw.Summary}\n\n{upscalerInfo}\n\nYour settings already suit this PC."));
                 return;
             }
             var list = string.Join("\n", changes.Select(c => $"{c.Label}: {c.From} → {c.To}"));
-            if (!Prompt.Confirm(firstRun ? "Settings for this PC" : "Best settings for this PC",
-                    $"{hw.Summary}\n\n{list}\n\nYou can change any of them later.", "Apply"))
+            if (!Prompt.Confirm(firstRun ? BloodborneLauncher.Core.UiText.T("Settings for this PC") : BloodborneLauncher.Core.UiText.T("Best settings for this PC"),
+                    BloodborneLauncher.Core.UiText.F($"{hw.Summary}\n\n{upscalerInfo}\n\n{list}\n\nYou can change any of them later."), BloodborneLauncher.Core.UiText.T("Apply")))
                 return;
             foreach (var change in changes) change.Apply();
             ws.SaveSoon();
-            ws.Log("Settings for this PC applied: " + string.Join(", ", changes.Select(c => $"{c.Label.ToLowerInvariant()} {c.To}")) + ".", LogLevel.Good);
+            ws.Log(BloodborneLauncher.Core.UiText.Format("Settings for this PC applied: {0}.",string.Join(", ", changes.Select(c => $"{c.Label.ToLowerInvariant()} {c.To}"))), LogLevel.Good);
             ReloadPages();
         }
 
         /// <summary>Builds the pages again after settings changed underneath them, staying on the current one.</summary>
+        public void ApplyLauncherLanguage()
+        {
+            var current=PageFrame.Content?.GetType()??typeof(MenuHomePage);
+            _navigation.Clear();SidebarItems.Children.Clear();SidebarItems.RowDefinitions.Clear();BuildSidebar();ScaleSidebar();
+            WindowsCaptionButtons.Children.OfType<System.Windows.Controls.Button>().First().ToolTip=BloodborneLauncher.Core.UiText.T("Minimize");
+            WindowsMaximize.ToolTip=BloodborneLauncher.Core.UiText.T(WindowState==WindowState.Maximized?"Restore":"Maximize");
+            WindowsCaptionButtons.Children.OfType<System.Windows.Controls.Button>().Last().ToolTip=BloodborneLauncher.Core.UiText.T("Close");
+            UpdateAudioToggle();_pages.Clear();NavigatePage(current);
+            SelectSidebar(current==typeof(MenuHomePage)?"home":current==typeof(PlayPage)?"play":
+                current==typeof(GraphicsPage)?"graphics":current==typeof(DisplayPage)?"display":
+                current==typeof(ControlsPage)?"controls":current==typeof(CheatsPage)?"cheats":
+                current==typeof(OnlinePage)?"online":current==typeof(TrophiesPage)?"trophies":current==typeof(MorePage)?"mods":"advanced");
+        }
+
         public void ReloadPages()
         {
             var current = PageFrame.Content as LauncherPage;
             _pages.Clear();
             if (current == null) return;
-            var page = _pages[current.GetType()] = (LauncherPage)Activator.CreateInstance(current.GetType())!;
-            if (!ReferenceEquals(PageFrame.Content,page)) PageFrame.Navigate(page);
-            RefreshAfterNavigation(page);
+            if (current is MenuHomePage) { GoHome(); return; }
+            NavigatePage(current.GetType());
         }
 
         /// <summary>The game ended with an error by itself: what happened, safe mode, a report to copy.</summary>
         private void OnGameCrashed(int code, SessionStats session)
         {
             var ws = Workspace.Current;
-            var choice = Prompt.Choose("The game crashed",
-                $"{CrashReport.Explain(code)} It ran for {SessionStats.Duration(session.Length)}.\n\n" +
-                "Safe mode starts the next run with the experimental engine options and mods off. " +
-                "Copy report puts the details and the end of the log on the clipboard, for a bug report.",
-                "Close", "Copy report", "Use safe mode");
+            var choice = Prompt.Choose(BloodborneLauncher.Core.UiText.T("The game crashed"),
+                BloodborneLauncher.Core.UiText.Format("{0}Safe mode starts the next run with the experimental engine options and mods off. Copy report puts the details and the end of the log on the clipboard, for a bug report.",BloodborneLauncher.Core.UiText.F($"{CrashReport.Explain(code)} It ran for {SessionStats.Duration(session.Length)}.\n\n")),
+                BloodborneLauncher.Core.UiText.T("Close"), BloodborneLauncher.Core.UiText.T("Copy report"), "Use safe mode");
             if (choice == 1)
             {
                 try
                 {
                     Clipboard.SetText(CrashReport.Build(ws.Settings, ws.Ini, code));
-                    ws.Log("Crash report copied to the clipboard.", LogLevel.Good);
+                    ws.Log(BloodborneLauncher.Core.UiText.T("Crash report copied to the clipboard."), LogLevel.Good);
                 }
                 catch (Exception e)
                 {
-                    ws.Log("Could not copy the report: " + e.Message, LogLevel.Warn);
+                    ws.Log(BloodborneLauncher.Core.UiText.Format("Could not copy the report: {0}",e.Message), LogLevel.Warn);
                 }
             }
             else if (choice == 2)
             {
                 ws.Settings.Set("safe_mode_next", true);
                 ws.SaveSoon();
-                ws.Log("The next start uses safe mode (once).", LogLevel.Step);
+                ws.Log(BloodborneLauncher.Core.UiText.T("The next start uses safe mode (once)."), LogLevel.Step);
             }
         }
 
-        /// <summary>
-        /// Modern layout: glass panes over the game's own artwork. Glass.xaml recolours the shared
-        /// brushes; the backdrop is the dump's sce_sys\pic1.png (or pic0), else the bundled art.
-        /// </summary>
-        private void ApplyGlass()
+        private void ApplyBloodborne()
         {
-            Application.Current.Resources.MergedDictionaries.Add(new ResourceDictionary
-            {
-                Source = new Uri("pack://application:,,,/Themes/Glass.xaml", UriKind.Absolute),
-            });
-            try
-            {
-                var image = new System.Windows.Media.Imaging.BitmapImage();
-                image.BeginInit();
-                image.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
-                image.DecodePixelWidth = 960; // blurred anyway
-                var game = GameEnvironment.GameDir(Workspace.Current.Settings);
-                var art = new[] { "pic1.png", "pic0.png" }
-                    .Select(n => System.IO.Path.Combine(game, "sce_sys", n))
-                    .FirstOrDefault(System.IO.File.Exists);
-                image.UriSource = art != null
-                    ? new Uri(art, UriKind.Absolute)
-                    : new Uri("pack://application:,,,/Assets/backdrop.jpg", UriKind.Absolute);
-                image.EndInit();
-                BackdropImage.Source = image;
-                BackdropImage.Visibility = Visibility.Visible;
-                BackdropShade.Visibility = Visibility.Visible;
-            }
-            catch
-            {
-                // No artwork: the glass sits on the plain dark background.
-            }
+            using (LauncherDiagnostics.Measure("Native font and theme")) LauncherAppearance.ApplyBloodborne();
+            using (LauncherDiagnostics.Measure("Native image installation")) MenuAssets.Install();
+            // Keep the compiled app.ico; extracted artwork belongs only to the launched game.
+            FontFamily = LauncherAppearance.MenuFont;
+            BackdropImage.Source = MenuAssets.Background;
+            StateChanged += (_, _) => {
+                WindowsMaximize.Content = WindowState == WindowState.Maximized ? "\uE923" : "\uE922";
+                WindowsMaximize.ToolTip = WindowState == WindowState.Maximized ? BloodborneLauncher.Core.UiText.T("Restore") : BloodborneLauncher.Core.UiText.T("Maximize");
+            };
         }
+
         /// <summary>A wider resize border than FluentWindow's 4px, and the top strip handed back
         /// to Windows as a real caption.</summary>
-        protected override void SetWindowChrome()
+        private bool _backdropReady;
+        private void RefreshBackdrop()
         {
-            base.SetWindowChrome();
-            if (System.Windows.Shell.WindowChrome.GetWindowChrome(this) is { } chrome)
-            {
-                if (ResizeMode != ResizeMode.NoResize)
-                    chrome.ResizeBorderThickness = new Thickness(8);
-                chrome.CaptionHeight = 34;
-            }
+            var dpi=VisualTreeHelper.GetDpi(this);
+            int width=BackdropResolutionPolicy.Width(ActualWidth>0?ActualWidth:Width,ActualHeight>0?ActualHeight:Height,dpi.DpiScaleX);
+            BackdropImage.Source=MenuAssets.LoadBackground(width);
+        }
+
+        private void SetWindowChrome()
+        {
+            System.Windows.Shell.WindowChrome.SetWindowChrome(this,new System.Windows.Shell.WindowChrome {
+                ResizeBorderThickness=new Thickness(8), CaptionHeight=34, CornerRadius=new CornerRadius(0),
+                GlassFrameThickness=new Thickness(0), NonClientFrameEdges=System.Windows.Shell.NonClientFrameEdges.None,
+                UseAeroCaptionButtons=false
+            });
         }
 
         private async void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
         {
-            Workspace.Current.SaveNow();
+            if (!RenderAudit.Enabled) Workspace.Current.SaveNow();
             if (_closing || !Workspace.Current.Game.Running)
                 return;
 
             var answer = System.Windows.MessageBox.Show(this,
-                "The game is still running. Stop it and close the launcher?",
+                UiText.T("The game is still running. Stop it and close the launcher?"),
                 "Bloodborne Launcher", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
             if (answer == MessageBoxResult.Cancel)
             {
@@ -287,60 +337,132 @@ namespace BloodborneLauncher
             _shownRefresh=Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,new Action(() =>
             {
                 _shownRefresh=null;
-                if (ReferenceEquals(PageFrame.Content,page)) page.OnShown();
+                if (ReferenceEquals(PageFrame.Content,page))
+                    using (LauncherDiagnostics.Measure("Refresh " + page.GetType().Name)) page.OnShown();
             }));
         }
 
-        private void SidebarItem_Checked(object sender, RoutedEventArgs e)
+        private LauncherPage GetPage(Type type)
         {
-            if (sender is not System.Windows.Controls.RadioButton { Tag: Type pageType } item)
-                return;
-
-            if (!_pages.TryGetValue(pageType, out var page))
-                _pages[pageType] = page = (LauncherPage)Activator.CreateInstance(pageType)!;
-            if (!ReferenceEquals(PageFrame.Content,page)) PageFrame.Navigate(page);
-            RefreshAfterNavigation(page);
-
-            var name = item.Content as string ??
-                       (item.Content as Panel)?.Children.OfType<System.Windows.Controls.TextBlock>().FirstOrDefault()?.Text;
-            TitlePage.Text = string.IsNullOrEmpty(name) ? "" : $" — {name}";
+            return _pages.GetOrCreate(type, () =>
+            {
+                var timer = System.Diagnostics.Stopwatch.StartNew();
+                LauncherPage page;
+                using (LauncherDiagnostics.Measure("Construct " + type.Name)) page = (LauncherPage)Activator.CreateInstance(type)!;
+                using (LauncherDiagnostics.Measure("Prepare " + type.Name)) page.PrepareForDisplay();
+                if (Environment.GetEnvironmentVariable("BB_LAUNCHER_UI_TRACE") == "1")
+                    Workspace.Current.Log(BloodborneLauncher.Core.UiText.F($"UI: constructed {type.Name} in {timer.Elapsed.TotalMilliseconds:0.0} ms"));
+                return page;
+            });
         }
 
-        /// <summary>Shows a page: a tab, or one of More's ("online", "output", "mods", "advanced").</summary>
+        private readonly Dictionary<string, System.Windows.Controls.Button> _navigation = new();
+        private void BuildSidebar()
+        {
+            foreach (var (key,label) in new[] {
+                ("home","Start"),("play","Game"),("display","Display"),("graphics","Graphics"),
+                ("controls","Controls"),("cheats","Tweaks"),("online","Online"),
+                ("trophies","Achievements"),("mods","More"),("advanced","Settings") })
+            {
+                var button=new System.Windows.Controls.Button { Content=BloodborneLauncher.Core.UiText.T(PcText.Get(label)),MinHeight=48,
+                    VerticalAlignment=VerticalAlignment.Stretch,HorizontalContentAlignment=HorizontalAlignment.Center };
+                if(key=="home"){button.FontSize=48;button.FontWeight=FontWeights.Bold;button.MinHeight=78;}
+                SidebarItems.RowDefinitions.Add(new RowDefinition { Height=new GridLength(key=="home"?1.8:1,GridUnitType.Star) });
+                Grid.SetRow(button,SidebarItems.RowDefinitions.Count-1);
+                button.SetResourceReference(StyleProperty,"BloodborneSidebarButton");
+                MenuSounds.SetClickCue(button,MenuSoundCue.Select);
+                button.Click+=(_,_)=>{if(key=="home")GoHome();else Show(key);};
+                SidebarItems.Children.Add(button);_navigation[key]=button;
+            }
+        }
+        private void SelectSidebar(string key)
+        { foreach(var pair in _navigation)pair.Value.Tag=pair.Key==key?"active":null; }
+        private void ScaleSidebar()
+        {
+            double scale=TabMetrics.SidebarScale(ActualWidth,ActualHeight);
+            SidebarColumn.Width=new GridLength(244*scale);
+            SidebarHost.Padding=new Thickness(0,26*scale,0,26*scale);
+            SidebarItems.MinHeight=480*scale;
+            foreach(var pair in _navigation)
+            {
+                bool home=pair.Key=="home";
+                pair.Value.FontSize=(home?48:26)*scale;
+                pair.Value.MinHeight=(home?78:48)*scale;
+            }
+        }
+        public bool IsMainMenu => PageFrame.Content is MenuHomePage;
+        public void GoHome()
+        {
+            NavigatePage(typeof(MenuHomePage));
+            SelectSidebar("home");
+        }
+        private void Home_Click(object sender, RoutedEventArgs e) => GoHome();
+
+        private CancellationTokenSource? _navigationCancel;
+        private long _navigationRequest;
+        private bool _closed;
+        private RetentionAudit? _retentionAudit;
+        private readonly NavigationMemoryCoordinator _navigationMemory;
+        private bool _navigationInProgress;
+
+        // Saves do not induce GC. Nested More navigation shares the same bounded coordinator.
+        public void QueuePageCleanup() => _retentionAudit?.Mark("settings");
+        public void QueueNavigationCleanup()
+        {
+            _retentionAudit?.Mark("navigation");
+            if(!_navigationInProgress)_navigationMemory.Queue();
+        }
+        private async void NavigatePage(Type type)
+        {
+            if(_closed)return;
+            _navigationInProgress=true;_navigationMemory.Suspend();
+            long request=++_navigationRequest;
+            _navigationCancel?.Cancel();_navigationCancel?.Dispose();
+            _navigationCancel=new CancellationTokenSource();
+            var cancel=_navigationCancel.Token;
+            if(type==typeof(MenuHomePage) && PageFrame.Content is LauncherPage and not MenuHomePage)
+            {
+                try { await MenuTransition.LeaveAsync(PageFrame,cancel); }
+                catch(OperationCanceledException) { return; }
+                if(_closed || request!=_navigationRequest)return;
+            }
+            else MenuTransition.Reset(PageFrame);
+            var page = GetPage(type);
+            if (!ReferenceEquals(PageFrame.Content,page))
+            {
+                PageFrame.Content=BloodborneLauncher.Core.UiText.T(page);
+                MenuTransition.Enter(PageFrame,page is not MenuHomePage,()=>{
+                    if(_closed || request!=_navigationRequest)return;
+                    _navigationInProgress=false;QueueNavigationCleanup();
+                });
+            }
+            else { _navigationInProgress=false;QueueNavigationCleanup(); }
+            BackdropShade.Fill = type == typeof(MenuHomePage) ? HomeShade : PageShade;
+            SettingsShade.Visibility = type == typeof(MenuHomePage) ? Visibility.Collapsed : Visibility.Visible;
+            RefreshAfterNavigation(page);
+        }
+
+        /// <summary>Preserve links from existing setting pages and diagnostics.</summary>
         public void Show(string page)
         {
-            var item = SettingRow.Classic
-                ? page switch
-                {
-                    "output" => ClassicOutput,
-                    "online" => ClassicOnline,
-                    "mods" => ClassicMods,
-                    "controls" => ClassicControls,
-                    _ => ClassicPlay,
-                }
-                : page switch
-                {
-                    "output" or "online" or "mods" or "advanced" => MoreItem,
-                    "controls" => ControlsItem,
-                    _ => PlayItem,
-                };
-            if (item.IsChecked == true)
-                SidebarItem_Checked(item, new RoutedEventArgs());
-            item.IsChecked = true;
-            if (item == MoreItem && _pages.TryGetValue(typeof(MorePage), out var more))
-                ((MorePage)more).ShowSection(page);
-        }
-
-        private void PageFrame_Navigated(object sender, System.Windows.Navigation.NavigationEventArgs e)
-        {
-            while (PageFrame.CanGoBack)
-                PageFrame.RemoveBackEntry();
+            var type = page switch {
+                "controls" => typeof(ControlsPage), "graphics" => typeof(GraphicsPage),
+                "display" => typeof(DisplayPage), "trophies" => typeof(TrophiesPage),
+                "online" => typeof(OnlinePage), "cheats" => typeof(CheatsPage),
+                "advanced" => typeof(SettingsPage), "mods" or "output" => typeof(MorePage),
+                _ => typeof(PlayPage),
+            };
+            NavigatePage(type);
+            SelectSidebar(page == "output" ? "mods" : page);
+            if (type == typeof(MorePage)) ((MorePage)GetPage(type)).ShowSection(page);
         }
 
         // ---------------------------------------------------------------- play
 
         private async void TitlePlay_Click(object sender, RoutedEventArgs e) => await PlayOrStopAsync();
 
+// The upstream update/install entry points are deliberately excluded from the build.
+#if false // Intentionally disabled; retained as upstream reference.
         private async void TitleUpdate_Click(object sender, RoutedEventArgs e) => await InstallUpdateAsync();
 
         /// <summary>Asks, downloads the newer launcher, swaps it in and restarts.</summary>
@@ -424,9 +546,12 @@ namespace BloodborneLauncher
             }
         }
 
+#endif
+
         /// <summary>The one place the game is started from, so the title bar and the Play page agree.</summary>
         public async Task PlayOrStopAsync()
         {
+            if (RenderAudit.Enabled) return;
             var ws = Workspace.Current;
             if (ws.Game.Running)
             {
@@ -448,7 +573,7 @@ namespace BloodborneLauncher
                     : null;
                 if (problem != null)
                 {
-                    Prompt.Tell("Online", problem + "\n\nOr turn \"Play online\" off to play offline.");
+                    Prompt.Tell(BloodborneLauncher.Core.UiText.T("Online"), BloodborneLauncher.Core.UiText.Format("{0}\n\nOr turn \u0022Play online\u0022 off to play offline.",problem));
                     Show("online");
                     return;
                 }
@@ -460,15 +585,15 @@ namespace BloodborneLauncher
                 ws.ResolvePort();
                 if (!Paths.IsPortDir(Paths.PortDir))
                 {
-                    if (!Prompt.Confirm("Where is the engine?",
+                    if (!Prompt.Confirm(BloodborneLauncher.Core.UiText.T("Where is the engine?"),
                             "The launcher needs the Bloodborne PC engine (the folder with run.py and bin\\bb-probe.exe). " +
-                            "It is normally the folder the launcher came in.", "Choose folder"))
+                            "It is normally the folder the launcher came in.", BloodborneLauncher.Core.UiText.T("Choose folder")))
                         return;
-                    var dialog = new Microsoft.Win32.OpenFolderDialog { Title = "Port folder (with Bloodborne.exe and run.py)" };
+                    var dialog = new Microsoft.Win32.OpenFolderDialog { Title = BloodborneLauncher.Core.UiText.T("Port folder (with Bloodborne.exe and run.py)") };
                     if (dialog.ShowDialog(this) != true) return;
                     if (!Paths.IsPortDir(dialog.FolderName))
                     {
-                        Prompt.Tell("Not the port folder", "That folder has no run.py with Bloodborne.exe or bin\\bb-probe.exe.");
+                        Prompt.Tell(BloodborneLauncher.Core.UiText.T("Not the port folder"), UiText.T("That folder has no run.py with Bloodborne.exe or bin\\bb-probe.exe."));
                         return;
                     }
                     s.Set("port_dir", dialog.FolderName);
@@ -484,15 +609,13 @@ namespace BloodborneLauncher
                 Patches.RegionChanging(GameEnvironment.PatchesDir(s)) is { Count: > 0 } region)
             {
                 var names = string.Join(", ", region.Select(p => $"\"{p.Name}\""));
-                var choice = Prompt.Choose("Play online with " + names + "?",
-                    names + " moves the game to a region that has no Bloodborne server, so Play online fails with " +
-                    "\"Failure to acquire information from the Bloodborne server\".\n\n" +
-                    "Leave it out for this session? It stays on for offline play.",
-                    "Cancel", "Keep it on", "Leave it out");
+                var choice = Prompt.Choose(BloodborneLauncher.Core.UiText.Format("Play online with {0}?",names),
+                    BloodborneLauncher.Core.UiText.Format("{0} moves the game to a region that has no Bloodborne server, so Play online fails with \u0022Failure to acquire information from the Bloodborne server\u0022.\n\nLeave it out for this session? It stays on for offline play.",names),
+                    BloodborneLauncher.Core.UiText.T("Cancel"), BloodborneLauncher.Core.UiText.T("Keep it on"), "Leave it out");
                 if (choice <= 0) return;
                 GameEnvironment.RegionPatchOnline = choice == 1 ? "keep" : "skip";
-                ws.Log(choice == 1 ? $"{names}: kept on while online; Play online will not reach the server."
-                    : $"{names}: left out while online; it applies again with online off.", LogLevel.Step);
+                ws.Log(choice == 1 ? BloodborneLauncher.Core.UiText.F($"{names}: kept on while online; Play online will not reach the server.")
+                    : BloodborneLauncher.Core.UiText.F($"{names}: left out while online; it applies again with online off."), LogLevel.Step);
             }
 
             // A third-party resolution patch while the output resolution sets the game's resolution
@@ -513,12 +636,9 @@ namespace BloodborneLauncher
                 var names = string.Join(", ", native.Select(p => $"\"{p.Name}\""));
                 if (s.Str("resolution_patch_native") != names)
                 {
-                    var choice = Prompt.Choose($"Use {patchW} × {patchH} as the output resolution?",
-                        names + $" makes the game draw at {patchW} × {patchH} by itself, so the upscaler preset can't lower " +
-                        "the render resolution (the upscaler runs as DLAA / native AA).\n\n" +
-                        $"Setting the output resolution to {patchW} × {patchH} instead gives the same picture and shape, " +
-                        "and the presets (Quality, Balanced, Performance) work. The patch is then left out while that output is set.",
-                        "Cancel", $"Use {patchW} × {patchH}", "Keep the patch");
+                    var choice = Prompt.Choose(BloodborneLauncher.Core.UiText.F($"Use {patchW} × {patchH} as the output resolution?"),
+                        BloodborneLauncher.Core.UiText.Format("{0}{1}the render resolution (the upscaler runs as DLAA / native AA).\n\n{2}and the presets (Quality, Balanced, Performance) work. The patch is then left out while that output is set.",names,BloodborneLauncher.Core.UiText.F($" makes the game draw at {patchW} × {patchH} by itself, so the upscaler preset can't lower "),BloodborneLauncher.Core.UiText.F($"Setting the output resolution to {patchW} × {patchH} instead gives the same picture and shape, ")),
+                        BloodborneLauncher.Core.UiText.T("Cancel"), BloodborneLauncher.Core.UiText.F($"Use {patchW} × {patchH}"), "Keep the patch");
                     if (choice <= 0) return;
                     if (choice == 1)
                     {
@@ -526,7 +646,7 @@ namespace BloodborneLauncher
                         ini.Save();
                         (outW, outH) = (patchW, patchH);
                         GameEnvironment.ResolutionPatchChoice = "skip";
-                        ws.Log($"Output resolution {patchW} × {patchH}; {names} left out (presets work).", LogLevel.Step);
+                        ws.Log(BloodborneLauncher.Core.UiText.F($"Output resolution {patchW} × {patchH}; {names} left out (presets work)."), LogLevel.Step);
                     }
                     else
                     {
@@ -540,12 +660,9 @@ namespace BloodborneLauncher
             {
                 var names = string.Join(", ", sizing.Select(p => $"\"{p.Name}\""));
                 // "Always on" is remembered for this set of patches (#18); another set asks again.
-                var choice = s.Str("resolution_patch_always") == names ? 1 : Prompt.Choose("Play with " + names + "?",
-                    $"The output resolution ({outW} × {outH}) already sets the game's resolution and widens the picture and UI to fill the screen. " +
-                    names + " sets its own on top: the picture keeps the patch's shape, with black bars.\n\n" +
-                    "Leave it out? It still applies with a 1920 × 1080 output. \"Always on\" keeps it and does not ask again " +
-                    "until the resolution patches switched on in Mods change.",
-                    "Cancel", "Keep on", "Leave out", "Always on");
+                var choice = s.Str("resolution_patch_always") == names ? 1 : Prompt.Choose(BloodborneLauncher.Core.UiText.Format("Play with {0}?",names),
+                    BloodborneLauncher.Core.UiText.Format("{0}{1} sets its own on top: the picture keeps the patch\u0027s shape, with black bars.\n\nLeave it out? It still applies with a 1920 \u00D7 1080 output. \u0022Always on\u0022 keeps it and does not ask again until the resolution patches switched on in Mods change.",BloodborneLauncher.Core.UiText.F($"The output resolution ({outW} × {outH}) already sets the game's resolution and widens the picture and UI to fill the screen. "),names),
+                    BloodborneLauncher.Core.UiText.T("Cancel"), BloodborneLauncher.Core.UiText.T("Keep on"), "Leave out", "Always on");
                 if (choice <= 0) return;
                 if (choice == 3)
                 {
@@ -554,8 +671,8 @@ namespace BloodborneLauncher
                     choice = 1;
                 }
                 GameEnvironment.ResolutionPatchChoice = choice == 1 ? "keep" : "skip";
-                ws.Log(choice == 1 ? $"{names}: kept on with the {outW} × {outH} output."
-                    : $"{names}: left out; the output resolution sets the picture.", LogLevel.Step);
+                ws.Log(choice == 1 ? BloodborneLauncher.Core.UiText.F($"{names}: kept on with the {outW} × {outH} output.")
+                    : BloodborneLauncher.Core.UiText.F($"{names}: left out; the output resolution sets the picture."), LogLevel.Step);
             }
 
             // A game left running in the background (an earlier start that never ended, or another
@@ -563,9 +680,8 @@ namespace BloodborneLauncher
             var leftovers = System.Diagnostics.Process.GetProcessesByName("bb-probe");
             if (leftovers.Length > 0)
             {
-                var choice = Prompt.Choose("The game is still running in the background",
-                    "bb-probe.exe from an earlier start is still running and holds the game's memory, so a new start would fail. " +
-                    "Close it and start?", "Cancel", "Close it and start");
+                var choice = Prompt.Choose(BloodborneLauncher.Core.UiText.T("The game is still running in the background"),
+                    BloodborneLauncher.Core.UiText.Format("bb-probe.exe from an earlier start is still running and holds the game\u0027s memory, so a new start would fail. Close it and start?"), BloodborneLauncher.Core.UiText.T("Cancel"), BloodborneLauncher.Core.UiText.T("Close it and start"));
                 if (choice <= 0) return;
                 foreach (var leftover in leftovers)
                 {
@@ -577,12 +693,12 @@ namespace BloodborneLauncher
                     catch { /* already gone */ }
                     leftover.Dispose();
                 }
-                ws.Log("Closed the game left running in the background.", LogLevel.Step);
+                ws.Log(BloodborneLauncher.Core.UiText.T("Closed the game left running in the background."), LogLevel.Step);
             }
 
             if (!s.Bool("memory_check_off") && MemoryCheck.Problem(ws.Ini) is { } memory)
             {
-                var choice = Prompt.Choose("Windows may run out of memory", memory, "Cancel", "Don't ask again", "Start anyway");
+                var choice = Prompt.Choose(BloodborneLauncher.Core.UiText.T("Windows may run out of memory"), BloodborneLauncher.Core.UiText.T(memory), BloodborneLauncher.Core.UiText.T("Cancel"), BloodborneLauncher.Core.UiText.T("Don't ask again"), "Start anyway");
                 if (choice <= 0) return;
                 if (choice == 1) s.Set("memory_check_off", true);
             }
@@ -590,7 +706,7 @@ namespace BloodborneLauncher
             var error = ws.StartGame();
             if (error != null)
             {
-                System.Windows.MessageBox.Show(this, error, "Could not start the game", MessageBoxButton.OK, MessageBoxImage.Warning);
+                System.Windows.MessageBox.Show(this, error, UiText.T("Could not start the game"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
             if (s.Bool("switch_to_output"))
@@ -599,62 +715,12 @@ namespace BloodborneLauncher
 
         private void UpdatePlayButton()
         {
+            if (_pages.TryGetValue(typeof(MenuHomePage), out var home))
+                ((MenuHomePage)home).SetRunning(Workspace.Current.Game.Running);
             var running = Workspace.Current.Game.Running;
-            TitlePlayText.Text = running ? "Stop" : "Play";
-            TitlePlayIcon.Symbol = running ? SymbolRegular.Stop24 : SymbolRegular.Play24;
-            TitlePlayIcon.Foreground = (Brush)FindResource(running ? "DangerTextBrush" : "AccentTextFillColorPrimaryBrush");
-            TitlePlay.ToolTip = running ? "Stop the game" : "Start the game";
             foreach (var page in _pages.Values)
                 (page as PlayPage)?.UpdateRunning();
         }
 
-        // ---------------------------------------------------------------- log
-
-        private void OnLogged(string message, LogLevel level)
-        {
-            _log.Add(new LogItem { Time = DateTime.Now.ToString("HH:mm:ss"), Message = message, Color = BrushFor(level) });
-            LogCount.Text = $"{_log.Count} events";
-            LogScroller.ScrollToEnd();
-
-            StatusText.Text = message;
-            StatusText.ToolTip = message;
-            StatusDot.Fill = level == LogLevel.Info ? (Brush)FindResource("StatusDotIdleBrush") : BrushFor(level);
-        }
-
-        private Brush BrushFor(LogLevel level) => (Brush)FindResource(level switch
-        {
-            LogLevel.Good => "GoodTextBrush",
-            LogLevel.Bad => "DangerTextBrush",
-            LogLevel.Warn => "WarningTextBrush",
-            LogLevel.Step => "AccentTextFillColorPrimaryBrush",
-            _ => "TextFillColorSecondaryBrush",
-        });
-
-        private void ClearLog_Click(object sender, RoutedEventArgs e)
-        {
-            _log.Clear();
-            LogCount.Text = "";
-            StatusText.Text = "Ready";
-            StatusText.ToolTip = null;
-            StatusDot.Fill = (Brush)FindResource("StatusDotIdleBrush");
-        }
-
-        private void ToggleLog_Click(object sender, RoutedEventArgs e) => ToggleLog();
-        private void StatusBar_Click(object sender, MouseButtonEventArgs e) => ToggleLog();
-
-        private void ToggleLog()
-        {
-            _logExpanded = !_logExpanded;
-            LogPanel.Visibility = _logExpanded ? Visibility.Visible : Visibility.Collapsed;
-            if (_logExpanded)
-                LogScroller.ScrollToEnd();
-        }
-    }
-
-    public class LogItem
-    {
-        public string Time { get; set; } = "";
-        public string Message { get; set; } = "";
-        public Brush Color { get; set; } = Brushes.White;
     }
 }

@@ -63,6 +63,22 @@ namespace BloodborneLauncher.Core
         public static string Label(string sdl) =>
             Buttons.FirstOrDefault(b => b.Sdl.Equals(sdl, StringComparison.OrdinalIgnoreCase))?.Label ?? sdl;
 
+        /// <summary>Localize known physical buttons without translating unknown device identifiers.</summary>
+        public static string DisplayLabel(string sdl)
+        {
+            var button = Buttons.FirstOrDefault(b => b.Sdl.Equals(sdl, StringComparison.OrdinalIgnoreCase));
+            return button == null ? sdl : UiText.T(button.Label);
+        }
+
+        /// <summary>A game-facing label is a controller button name, never a generic menu option.</summary>
+        public static string GameLabel(string label) => label switch
+        {
+            "Cross" or "Circle" or "Square" or "Triangle" or
+            "D-pad up" or "D-pad down" or "D-pad left" or "D-pad right" or
+            "Touchpad (left)" or "Touchpad (right)" => UiText.T(label),
+            _ => label
+        };
+
         /// <summary>Puts <paramref name="button"/> on <paramref name="input"/>; the input that had it gets this one's old button.</summary>
         public static void Assign(IniFile ini, string input, string button)
         {

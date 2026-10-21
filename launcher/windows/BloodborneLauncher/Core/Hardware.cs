@@ -7,8 +7,8 @@ namespace BloodborneLauncher.Core
     /// <summary>
     /// What this PC has (GPU and its memory, CPU, RAM, the main display) and the settings that
     /// suit it: upscaler, quality preset, output resolution, frame rate cap and motion vectors.
-    /// The GPU comes from the display adapters' registry keys (the one with the most memory, so
-    /// the discrete card on a laptop), the display from its current mode.
+        /// The GPU follows the selected Vulkan adapter; registry detection is a fallback when
+        /// Vulkan is unavailable. The display comes from its current mode.
     /// </summary>
     public sealed record Hardware(string Gpu, string Vendor, long VramBytes, string Cpu, int Threads, long RamBytes,
         int ScreenWidth, int ScreenHeight, int RefreshHz)
@@ -97,7 +97,9 @@ namespace BloodborneLauncher.Core
         // ---------------------------------------------------------------- recommendation
 
         /// <summary>What would change to suit this PC; empty when the settings already do.</summary>
-        public List<Change> Recommend(LauncherSettings s, IniFile ini)
+        public List<Change> Recommend(LauncherSettings s, IniFile ini) => Recommend(s, ini, out _);
+
+        public List<Change> Recommend(LauncherSettings s, IniFile ini, out UpscalerRecommendation upscaler)
         {
             var changes = new List<Change>();
             void Ini(string label, string key, string to, IReadOnlyList<Choice>? names = null, string fallback = "")
@@ -114,14 +116,11 @@ namespace BloodborneLauncher.Core
             }
 
             var tier = GpuTier;
-            var dlss = File.Exists(Path.Combine(Paths.BinariesDir, "nvngx_dlss.dll"));
-            Ini("Upscaler", "upscaler", Rtx && dlss ? "dlss" : Rdna4 ? "fsr4" : "fsr3", Choices.Upscalers);
 
             // The output: the display's own size, by name where it is one of the choices, else
             // "Display (auto)"; 1920 x 1080 when the display is unknown.
             var output = ScreenWidth == 0 ? "1920x1080"
                 : Choices.OutputResolutions.Select(c => c.Value).FirstOrDefault(v => v == $"{ScreenWidth}x{ScreenHeight}") ?? "auto";
-            Ini("Output resolution", "output_res", output, Choices.OutputResolutions, "1920x1080");
 
             // How far below the output the game renders: more for bigger outputs and smaller GPUs.
             var height = Choices.OutputSize(output).H;
@@ -139,6 +138,10 @@ namespace BloodborneLauncher.Core
                 (_, Tier.Mid) => 3,
                 _ => 4,
             };
+            var size = Choices.OutputSize(output);
+            upscaler = UpscalerRecommendation.For(this, s, size.W, size.H, preset);
+            Ini("Upscaler", "upscaler", upscaler.Value, Choices.Upscalers);
+            Ini("Output resolution", "output_res", output, Choices.OutputResolutions, "1920x1080");
             Ini("Quality preset", "preset", preset.ToString(), Choices.Presets, "0");
 
             // 120 needs a fast display, a mid or better GPU and a CPU with 12+ threads (the game's

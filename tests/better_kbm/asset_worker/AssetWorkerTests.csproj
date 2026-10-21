@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>
+  <ItemGroup><Compile Include="../../../launcher/windows/BloodborneLauncher/Core/AssetExtractionProcess.cs" Link="AssetExtractionProcess.cs" /></ItemGroup>
+<ItemGroup><Compile Include="../../../launcher/windows/BloodborneLauncher/Core/UiText.cs" Link="UiText.cs"/><EmbeddedResource Include="../../../launcher/windows/BloodborneLauncher/Localization/*.json"><LogicalName>BloodborneLauncher.Localization.%(Filename).json</LogicalName></EmbeddedResource></ItemGroup></Project>

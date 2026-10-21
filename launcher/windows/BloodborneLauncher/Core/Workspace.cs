@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Windows.Threading;
 
 namespace BloodborneLauncher.Core
@@ -26,6 +26,7 @@ namespace BloodborneLauncher.Core
 
         private DispatcherTimer? _trophyTimer;
         private DispatcherTimer? _outputTimer;
+        private bool _outputContinuationQueued;
         private readonly System.Collections.Concurrent.ConcurrentQueue<string> _pendingOutput = new();
 
         /// <summary>The game's output so far (this run), oldest first.</summary>
@@ -51,13 +52,14 @@ namespace BloodborneLauncher.Core
 
         public void Initialise()
         {
-            Settings.Load();
-            ResolvePort();
+            using (LauncherDiagnostics.Measure("Workspace settings")) Settings.Load();
+            using (LauncherDiagnostics.Measure("Engine path and INI resolution")) ResolvePort();
 
             // Trophies: what the saves folder already holds is read silently; new unlocks after
             // this are announced. trophies.log and last_run.log are checked every two seconds, so
             // games started without the launcher (Play Bloodborne.exe, Steam) are announced too.
-            Trophies.SetUserDir(GameEnvironment.UserDir(Settings));
+            using (LauncherDiagnostics.Measure("Initial achievement log scan"))
+                Trophies.SetUserDir(GameEnvironment.UserDir(Settings));
             _trophyTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
             _trophyTimer.Tick += (_, _) =>
             {
@@ -69,23 +71,23 @@ namespace BloodborneLauncher.Core
                 }
                 Announce(Trophies.Poll(readRunLog: !Game.Running));
             };
-            _trophyTimer.Start();
+            if (!RenderAudit.Enabled) _trophyTimer.Start();
 
             // Output arrives on the reader threads, often thousands of lines at once (the engine's
             // statistics when it exits): it is queued and handed on in batches, ten times a second.
             Game.Output += line => _pendingOutput.Enqueue(line);
-            _outputTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+            _outputTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(100) };
             _outputTimer.Tick += (_, _) => FlushOutput();
             _outputTimer.Start();
             Game.Exited += code => Dispatch(() =>
             {
-                Log(code == 0 ? "The game exited normally." : $"The game exited with code {code}.",
+                Log(code == 0 ? BloodborneLauncher.Core.UiText.T("The game exited normally.") : BloodborneLauncher.Core.UiText.F($"The game exited with code {code}."),
                     code == 0 ? LogLevel.Good : LogLevel.Warn);
                 _pendingOutput.Enqueue($"— the game exited (code {code}) —");
-                FlushOutput();
+                FlushOutput(drain: true);
                 if (_hdrBefore.Count > 0 && WindowsHdr.Restore(_hdrBefore) is > 0 and var restored)
-                    Log(restored == 1 ? "Windows HDR was switched off during the game; turned it back on."
-                                      : $"Windows HDR was switched off on {restored} displays during the game; turned it back on.", LogLevel.Info);
+                    Log(restored == 1 ? BloodborneLauncher.Core.UiText.T("Windows HDR was switched off during the game; turned it back on.")
+                                      : BloodborneLauncher.Core.UiText.F($"Windows HDR was switched off on {restored} displays during the game; turned it back on."), LogLevel.Info);
                 _hdrBefore = new();
                 var stopped = _stopping;
                 _stopping = false;
@@ -96,7 +98,7 @@ namespace BloodborneLauncher.Core
                     {
                         SessionStats.AddPlaytime(Settings, PlayerProfiles.Current(Settings), session.Length);
                         SaveSoon();
-                        Log("Session: " + session.Summary, LogLevel.Info);
+                        Log(BloodborneLauncher.Core.UiText.Format("Session: {0}",session.Summary), LogLevel.Info);
                     }
                     if (code != 0 && !stopped)
                         GameCrashed?.Invoke(code, session);
@@ -136,6 +138,8 @@ namespace BloodborneLauncher.Core
             PortChanged?.Invoke();
         }
 
+// Update queries are disabled, including callers with previously saved update preferences.
+#if false // Intentionally disabled; retained as upstream reference.
         // ---------------------------------------------------------------- updates
 
         /// <summary>The latest release when it is newer than this build.</summary>
@@ -169,6 +173,8 @@ namespace BloodborneLauncher.Core
             UpdateStateChanged?.Invoke();
         }
 
+#endif
+
         /// <summary>Trophies the loaded save had already earned: one line in the log, and a notification
         /// only for a platinum they complete.</summary>
         private void AnnounceFromSave(List<int> ids)
@@ -176,7 +182,7 @@ namespace BloodborneLauncher.Core
             if (ids.Count == 0) return;
             var names = ids.Where(id => id != TrophyTracker.PlatinumId && TrophyTracker.ById.ContainsKey(id))
                 .Select(id => TrophyTracker.ById[id].Name).ToList();
-            if (names.Count > 0) Log($"Trophies already earned in this save: {string.Join(", ", names)}", LogLevel.Good);
+            if (names.Count > 0) Log(BloodborneLauncher.Core.UiText.F($"Trophies already earned in this save: {string.Join(", ", names)}"), LogLevel.Good);
             Announce(ids.Where(id => id == TrophyTracker.PlatinumId).ToList());
             TrophiesChanged?.Invoke();
         }
@@ -187,7 +193,7 @@ namespace BloodborneLauncher.Core
             foreach (var id in ids)
             {
                 if (!TrophyTracker.ById.TryGetValue(id, out var trophy)) continue;
-                Log($"Trophy unlocked: {trophy.Name} ({trophy.Grade})", LogLevel.Good);
+                Log(BloodborneLauncher.Core.UiText.F($"Trophy unlocked: {trophy.Name} ({trophy.Grade})"), LogLevel.Good);
                 if (Settings.Bool("trophy_notifications"))
                     Views.TrophyToast.Announce(trophy);
             }
@@ -211,6 +217,7 @@ namespace BloodborneLauncher.Core
 
         public void SaveNow()
         {
+            if (RenderAudit.Enabled) return;
             _saveTimer?.Stop();
             try
             {
@@ -220,13 +227,13 @@ namespace BloodborneLauncher.Core
                 else if (!_iniWarned)
                 {
                     _iniWarned = true;
-                    Log("bbport.ini not written: the engine folder is not set (Settings › Bloodborne PC).", LogLevel.Warn);
+                    Log(BloodborneLauncher.Core.UiText.T("bbport.ini not written: the engine folder is not set (Settings › Bloodborne PC)."), LogLevel.Warn);
                 }
                 Saved?.Invoke();
             }
             catch (Exception e)
             {
-                Log("Could not save settings: " + e.Message, LogLevel.Bad);
+                Log(BloodborneLauncher.Core.UiText.Format("Could not save settings: {0}",e.Message), LogLevel.Bad);
             }
         }
 
@@ -243,11 +250,11 @@ namespace BloodborneLauncher.Core
                 try
                 {
                     if (SaveBackups.Create(Settings) != null)
-                        Log($"Saves backed up before playing (the newest {SaveBackups.Keep} are kept).", LogLevel.Step);
+                        Log(BloodborneLauncher.Core.UiText.F($"Saves backed up before playing (the newest {SaveBackups.Keep} are kept)."), LogLevel.Step);
                 }
                 catch (Exception e)
                 {
-                    Log("Could not back up the saves: " + e.Message, LogLevel.Warn);
+                    Log(BloodborneLauncher.Core.UiText.Format("Could not back up the saves: {0}",e.Message), LogLevel.Warn);
                 }
             }
             var safeMode = Settings.Bool("safe_mode_next");
@@ -256,10 +263,10 @@ namespace BloodborneLauncher.Core
             var error = Game.Start(Settings);
             if (error != null)
             {
-                Log(error, LogLevel.Bad);
+                Log(BloodborneLauncher.Core.UiText.T(error), LogLevel.Bad);
                 return error;
             }
-            Log(GameRunner.Custom(Settings) ? "Started the game with the custom command." : "Started Bloodborne.", LogLevel.Step);
+            Log(GameRunner.Custom(Settings) ? BloodborneLauncher.Core.UiText.T("Started the game with the custom command.") : BloodborneLauncher.Core.UiText.T("Started Bloodborne."), LogLevel.Step);
             if (Settings.Bool("section_stats"))
             {
                 // Timing every render stage costs frame rate: one game only.
@@ -271,7 +278,7 @@ namespace BloodborneLauncher.Core
                 // One run only: the next start uses the settings as chosen again.
                 Settings.Set("safe_mode_next", false);
                 SaveSoon();
-                Log("Safe mode for this run: experimental engine options and mods are off.", LogLevel.Step);
+                Log(BloodborneLauncher.Core.UiText.T("Safe mode for this run: experimental engine options and mods are off."), LogLevel.Step);
             }
             GameStateChanged?.Invoke();
             return null;
@@ -279,7 +286,7 @@ namespace BloodborneLauncher.Core
 
         public async Task StopGameAsync()
         {
-            Log("Stopping the game…", LogLevel.Step);
+            Log(BloodborneLauncher.Core.UiText.T("Stopping the game…"), LogLevel.Step);
             _stopping = true;
             await Game.StopAsync();
             GameStateChanged?.Invoke();
@@ -294,11 +301,13 @@ namespace BloodborneLauncher.Core
         public void Log(string message, LogLevel level = LogLevel.Info) =>
             Dispatch(() => Logged?.Invoke(message, level));
 
-        private void FlushOutput()
+        private void FlushOutput(bool drain = false)
         {
             if (_pendingOutput.IsEmpty) return;
             var batch = new List<string>();
-            while (_pendingOutput.TryDequeue(out var line)) batch.Add(line);
+            // A compiler/engine burst must yield back to input and rendering.
+            const int batchLimit = 256;
+            while ((drain || batch.Count < batchLimit) && _pendingOutput.TryDequeue(out var line)) batch.Add(line);
             foreach (var line in batch)
             {
                 Announce(Trophies.Observe(line));
@@ -309,6 +318,14 @@ namespace BloodborneLauncher.Core
             if (OutputLines.Count > MaxOutputLines)
                 OutputLines.RemoveRange(0, OutputLines.Count - MaxOutputLines);
             GameOutput?.Invoke(batch);
+            if (!drain && !_pendingOutput.IsEmpty && !_outputContinuationQueued)
+            {
+                _outputContinuationQueued = true;
+                System.Windows.Application.Current.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => {
+                    _outputContinuationQueued = false;
+                    FlushOutput();
+                }));
+            }
         }
 
         private static void Dispatch(Action action)

@@ -160797,7 +160797,6 @@ index d310098..1a0e045 100644
 +
 +} // namespace Vulkan
 diff --git a/gpu/shadps4/video_core/renderer_vulkan/vk_temporal_upscaler.cpp b/gpu/shadps4/video_core/renderer_vulkan/vk_temporal_upscaler.cpp
-index a3240be..fc2e3c4 100644
 --- a/gpu/shadps4/video_core/renderer_vulkan/vk_temporal_upscaler.cpp
 +++ b/gpu/shadps4/video_core/renderer_vulkan/vk_temporal_upscaler.cpp
 @@ -10,10 +10,12 @@
@@ -160821,7 +160820,7 @@ index a3240be..fc2e3c4 100644
  #include "video_core/renderer_vulkan/vk_instance.h"
  #include "video_core/renderer_vulkan/vk_runtime.h"
  #include "video_core/renderer_vulkan/vk_scheduler.h"
-@@ -173,15 +176,25 @@ void DumpFinalFrameIfDue(const Instance& instance, Scheduler& scheduler, vk::Com
+@@ -173,15 +176,25 @@
  
  TemporalUpscaler::TemporalUpscaler(const Instance& instance_, Scheduler& scheduler_,
                                     VideoCore::TextureCache& texture_cache_, Runtime& runtime_,
@@ -160850,30 +160849,37 @@ index a3240be..fc2e3c4 100644
                                           dlss && dlss->Available());
      fsr4 = std::make_unique<Fsr4Upscaler>(instance, scheduler);
      // Available unless BB_UPSCALER=none; on/off and the parameters are the menu's settings.
-@@ -212,6 +225,11 @@ TemporalUpscaler::TemporalUpscaler(const Instance& instance_, Scheduler& schedul
+@@ -211,6 +224,11 @@
+             render_width = w;
              render_height = h;
          }
-     }
++    }
 +    // FSR 4's model, built in the background from the start (its first build compiles for
 +    // tens of seconds on some drivers), so it is usually ready when the game's first frame is.
 +    if (enabled && BbSettings::Get().upscaler == BbSettings::UpscalerFsr4) {
 +        fsr4->Prewarm(BbSettings::RenderPreset(), target_width, target_height);
-+    }
+     }
      // Scene depth copied into the output-size UI depth by a blit (depth aspect).
      const auto features = instance.GetPhysicalDevice()
-                               .getFormatProperties(vk::Format::eD32SfloatS8Uint)
-@@ -352,8 +370,8 @@ bool TemporalUpscaler::OnFrameStart() {
-     const int output = settings.output_res.load();
+@@ -349,12 +367,13 @@
+     const bool active = Active();
+     const bool jitter_on = active && settings.jitter && !BbToggle::Disabled(1u << 25);
+     const int upscaler = settings.upscaler.load();
+-    const int output = settings.output_res.load();
++    const int output = BbSettings::RenderOutput();
      const bool output_changed = !scaled_session && applied_output != output;
      if (output_changed) {
 -        target_width = BbSettings::OutputWidths[output];
 -        target_height = BbSettings::OutputHeights[output];
+-        std::printf("Output resolution: %ux%u (live)\n", target_width, target_height);
 +        target_width = BbSettings::OutputWidth(output);
 +        target_height = BbSettings::OutputHeight(output);
-         std::printf("Output resolution: %ux%u (live)\n", target_width, target_height);
++        std::printf("Output resolution: %ux%u (%s)\n", target_width, target_height,
++                    BbSettings::LiveOutputChangesEnabled() ? "live" : "startup; changes require restart");
          failed = false;
          fsr4_failed = false;
-@@ -367,10 +385,28 @@ bool TemporalUpscaler::OnFrameStart() {
+     }
+@@ -367,10 +386,28 @@
          if (BbSettings::IsFrameUpscaler(upscaler)) BbSettings::Get().fsr4_problem = nullptr;
      }
      if (applied_upscaler != upscaler) fsr4_failed = false; // retry after a menu change
@@ -160903,7 +160909,7 @@ index a3240be..fc2e3c4 100644
                                                          {target_width, target_height}));
          render_width = scene_targets.Size().width;
          render_height = scene_targets.Size().height;
-@@ -411,15 +447,23 @@ bool TemporalUpscaler::OnFrameStart() {
+@@ -411,15 +448,23 @@
  }
  
  void TemporalUpscaler::OnDispatch(u64 cs_hash) {
@@ -160915,6 +160921,8 @@ index a3240be..fc2e3c4 100644
 -    if (!scene_color || !camera_motion.Ready() || !Active()) {
 -        reset = true;
 -        return;
+-    }
+-    Run();
 +    if (!done_this_frame && !failed && !Scaled()) {
 +        done_this_frame = true;
 +        if (!scene_color || !camera_motion.Ready() || !Active()) {
@@ -160928,12 +160936,11 @@ index a3240be..fc2e3c4 100644
 +    // own compute passes reading it would.
 +    if (scene_color && HdrNative::Wanted()) {
 +        hdr_native.OnSceneColor(scene_color);
-     }
--    Run();
++    }
  }
  
  bool TemporalUpscaler::EnsureResources(u32 w, u32 h, u32 ow, u32 oh, bool hdr) {
-@@ -1106,6 +1150,7 @@ bool TemporalUpscaler::RecordReactive(vk::ImageView color_view) {
+@@ -1106,6 +1151,7 @@
  }
  
  void TemporalUpscaler::Run() {
@@ -160941,7 +160948,7 @@ index a3240be..fc2e3c4 100644
      if (auto* profiler = GpuProfiler::Get()) {
          const char* label = BbSettings::Get().upscaler == BbSettings::UpscalerTaa
              ? "upscaler Run (TAA)" : "upscaler Run (FSR)";
-@@ -1195,6 +1240,7 @@ void TemporalUpscaler::Run() {
+@@ -1195,6 +1241,7 @@
      last_frame = now;
  
      bool dispatched = false;
@@ -160949,7 +160956,7 @@ index a3240be..fc2e3c4 100644
      if (BbSettings::Get().upscaler == BbSettings::UpscalerTaa) {
          RecordTaa(cmdbuf, input_color_view, input_depth_view);
          dispatched = true;
-@@ -1274,6 +1320,7 @@ void TemporalUpscaler::Run() {
+@@ -1274,6 +1321,7 @@
              dispatched = true;
          }
      }
@@ -160957,7 +160964,7 @@ index a3240be..fc2e3c4 100644
      if (dispatched) {
          reset = false;
          dispatched_last_frame = true;
-@@ -1413,7 +1460,16 @@ float TemporalUpscaler::SceneMipBias() const {
+@@ -1413,7 +1461,16 @@
      if (!Active() || BbSettings::Get().upscaler == BbSettings::UpscalerTaa) return 0.0f;
      const float render = float(BbSettings::Get().active_render_width.load());
      const float output = float(Scaled() ? target_width : 1920u);
@@ -160975,7 +160982,7 @@ index a3240be..fc2e3c4 100644
  }
  
  bool TemporalUpscaler::Scaled() const {
-@@ -1436,6 +1492,20 @@ void TemporalUpscaler::OnColorTarget(VideoCore::ImageId color) {
+@@ -1436,6 +1493,20 @@
  void TemporalUpscaler::OnDraw(u64 vs_hash, VideoCore::ImageId color,
                                VideoCore::ImageId depth, bool native_viewport) {
      if (!Scaled() && vs_hash == ui_trigger_vs) done_this_frame = true;
@@ -160996,7 +161003,7 @@ index a3240be..fc2e3c4 100644
      if (!Scaled()) {
          return;
      }
-@@ -1469,14 +1539,66 @@ void TemporalUpscaler::OnDraw(u64 vs_hash, VideoCore::ImageId color,
+@@ -1469,14 +1540,66 @@
      case UiComposition::Background::Temporal:
          RunScaled();
          if (ui_phase) {
@@ -161008,6 +161015,7 @@ index a3240be..fc2e3c4 100644
      case UiComposition::Background::Copy:
          RunUiOnly(color, depth);
 -        return;
+-    }
 +        break;
 +    }
 +    // bbport: native HDR output: the output-size frame the UI is about to be drawn into.
@@ -161059,13 +161067,13 @@ index a3240be..fc2e3c4 100644
 +                source = hdr_native.Guest(id, vk::Format::eR8G8B8A8Unorm);
 +            }
 +        }
-     }
++    }
 +    hdr_native.OnDisplayPass(address, source);
 +    hdr_ui_target = {};
  }
  
  void TemporalUpscaler::EnsureUiResources(u32 w, u32 h, vk::Format color, vk::Format depth) {
-@@ -1632,15 +1754,28 @@ void TemporalUpscaler::RunUiOnly(VideoCore::ImageId color_id, VideoCore::ImageId
+@@ -1632,15 +1755,28 @@
                          vk::PipelineStageFlagBits2::eTransfer, vk::AccessFlagBits2::eTransferRead);
          runtime.FlushBarriers();
      }
@@ -161099,7 +161107,7 @@ index a3240be..fc2e3c4 100644
                        region](vk::CommandBuffer cmd) {
          vk::ImageMemoryBarrier2 barrier{
              .srcStageMask = vk::PipelineStageFlagBits2::eAllCommands,
-@@ -1653,6 +1788,18 @@ void TemporalUpscaler::RunUiOnly(VideoCore::ImageId color_id, VideoCore::ImageId
+@@ -1653,6 +1789,18 @@
              .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1},
          };
          cmd.pipelineBarrier2({.imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &barrier});
@@ -161118,7 +161126,7 @@ index a3240be..fc2e3c4 100644
          cmd.blitImage(source, source_layout, ui, vk::ImageLayout::eTransferDstOptimal, region,
                        vk::Filter::eLinear);
          barrier.srcStageMask = vk::PipelineStageFlagBits2::eTransfer;
-@@ -2210,9 +2357,9 @@ bool TemporalUpscaler::UseFsr4() const {
+@@ -2210,9 +2358,9 @@
          return dlss && dlss->Available() && !fsr4_failed;
      }
      const bool supported = selected == BbSettings::UpscalerFsr411
@@ -161130,7 +161138,7 @@ index a3240be..fc2e3c4 100644
  }
  
  bool TemporalUpscaler::RecordFsr4(vk::CommandBuffer cmdbuf, Fsr4Upscaler::Image color,
-@@ -2257,7 +2404,12 @@ bool TemporalUpscaler::RecordFsr4(vk::CommandBuffer cmdbuf, Fsr4Upscaler::Image
+@@ -2257,7 +2405,12 @@
          BbSettings::Get().fsr4_problem = kept[next].c_str();
          next = (next + 1) % kept.size();
      }
@@ -171080,7 +171088,35 @@ diff --git a/gpu/shim/bbport_settings.cpp b/gpu/shim/bbport_settings.cpp
      } else if ((requested == UpscalerFsr4 && !v.fsr4_supported) ||
          (requested == UpscalerFsr411 && !v.fsr411_supported)) {
          v.fsr4_problem = "GPU does not support the selected FSR 4 shaders; using FSR 3.1";
-@@ -264,7 +475,7 @@
+@@ -237,6 +448,19 @@
+     return size && size[0];
+ }
+ 
++bool LiveOutputChangesEnabled() {
++    if (FixedRenderSession()) return false;
++    const char* resolved = std::getenv("BB_LIVE_RES");
++    if (resolved && resolved[0]) return std::strcmp(resolved, "1") == 0;
++    // A direct engine start without the Windows resolver uses the explicit startup setting.
++    return Get().startup_live_resolution == 1;
++}
++
++int RenderOutput() {
++    const auto& v = Get();
++    return LiveOutputChangesEnabled() ? v.output_res.load() : v.startup_output_res;
++}
++
+ int RenderPreset() {
+     const auto& v = Get();
+     return FixedRenderSession() ? v.startup_preset :
+@@ -245,6 +469,7 @@
+ 
+ bool ResolutionNeedsRestart() {
+     const auto& v = Get();
++    if (!LiveOutputChangesEnabled() && v.output_res != v.startup_output_res) return true;
+     // TAA needs the live path (native guest targets): run.sh selects it on restart.
+     return FixedRenderSession() &&
+         (v.preset != v.startup_preset || v.output_res != v.startup_output_res ||
+@@ -264,7 +489,7 @@
          return std::string(text);
      };
      const auto flag = [](bool value) { return std::string(value ? "1" : "0"); };
@@ -171089,7 +171125,7 @@ diff --git a/gpu/shim/bbport_settings.cpp b/gpu/shim/bbport_settings.cpp
      put("upscaler", UpscalerName(v.upscaler));
      put("preset", std::to_string(v.preset.load()));
      put("sharpen", flag(v.sharpen));
-@@ -277,6 +488,12 @@
+@@ -277,6 +502,12 @@
      put("reactive_max", fixed(v.reactive_max, 2));
      put("debug_view", std::to_string(v.debug_view.load()));
      put("show_fps", flag(v.show_fps));
@@ -171102,7 +171138,7 @@ diff --git a/gpu/shim/bbport_settings.cpp b/gpu/shim/bbport_settings.cpp
      put("fsr4_auto_exposure", flag(v.fsr4_auto_exposure));
      put("fsr4_invert_jitter", flag(v.fsr4_invert_jitter));
      // Read by patches.py at start.
-@@ -284,14 +501,31 @@
+@@ -284,14 +515,31 @@
          put(Effects[e].key, flag(v.effects[e]));
      }
      put("fullscreen", flag(v.fullscreen));
@@ -171134,7 +171170,7 @@ diff --git a/gpu/shim/bbport_settings.cpp b/gpu/shim/bbport_settings.cpp
      put("pc_controls",flag(v.pc_controls));
      put("mouse_camera",flag(v.mouse_camera));
      put("mouse_menu",flag(v.mouse_menu));
-@@ -299,14 +533,26 @@
+@@ -299,14 +547,26 @@
      put("mouse_invert_y",flag(v.mouse_invert_y));
      put("mouse_auto_rotation",flag(v.mouse_auto_rotation));
      put("mouse_sensitivity",std::to_string(v.mouse_sensitivity.load()));
@@ -171333,7 +171369,17 @@ diff --git a/gpu/shim/bbport_settings.h b/gpu/shim/bbport_settings.h
  const char* MenuText(const char* english, const char* russian);
  
  /// Reads the file, then the environment overrides. Called once at start.
-@@ -123,3 +212,5 @@
+@@ -112,6 +201,9 @@
+ void ConfigureUpscalerSupport(bool fsr4, bool fsr411, bool dlss = false);
+ /// Startup-patched scene dimensions cannot change until run.sh prepares a new image.
+ bool FixedRenderSession();
++/// Output changes require restart when disabled, independently of the guest resolution patch.
++bool LiveOutputChangesEnabled();
++int RenderOutput();
+ int RenderPreset();
+ bool ResolutionNeedsRestart();
+ /// Writes the file (menu changes).
+@@ -123,3 +215,5 @@
  const char* UpscalerName(int upscaler);
  
  } // namespace BbSettings
@@ -184683,7 +184729,7 @@ diff --git a/scripts/run_windows.py b/scripts/run_windows.py
  import zlib
  from mods import remove_overlay
  
-@@ -46,6 +50,24 @@
+@@ -46,6 +50,46 @@
  
  def msys_root():
      return Path(os.environ.get('BB_MSYS2', r'C:\msys64'))
@@ -184701,6 +184747,28 @@ diff --git a/scripts/run_windows.py b/scripts/run_windows.py
 +        return None
 +
 +
++def configure_live_resolution(config, out):
++    """Resolve once for every output, including native 1080p and TAA, and pass it to the renderer."""
++    # A restarted probe inherits our resolved flag. Do not mistake that generated value
++    # for an explicit user override and pin the old selection across Apply and restart.
++    source = os.environ.get('BB_LIVE_RES_SOURCE')
++    override = None if source == 'settings' else 'auto' if source == 'auto-override' else os.environ.get('BB_LIVE_RES')
++    requested = override or settings_value(config, 'live_resolution') or '0'
++    if not override:
++        os.environ['BB_LIVE_RES_SOURCE'] = 'settings'
++    elif override == 'auto':
++        os.environ['BB_LIVE_RES_SOURCE'] = 'auto-override'
++    else:
++        os.environ.pop('BB_LIVE_RES_SOURCE', None)
++    resolved = requested
++    if requested == 'auto':
++        resolved = run([out / 'bb-gpu-capabilities.exe', '--live-resolution'], capture=True, check=False) or '0'
++    resolved = '1' if resolved == '1' else '0'
++    os.environ['BB_LIVE_RES'] = resolved
++    print(f'Live output resolution changes: {"on" if resolved == "1" else "off (restart required)"}', flush=True)
++    return resolved
++
++
 +def large_scene(render):
 +    """Whether a scene of `render` ('WxH') needs the 9152 MiB pool: above 1920x1080."""
 +    w, h = (int(v) for v in render.split('x'))
@@ -184708,7 +184776,7 @@ diff --git a/scripts/run_windows.py b/scripts/run_windows.py
  
  
  def run(arguments, capture=False, check=True, env=None):
-@@ -78,6 +100,52 @@
+@@ -78,6 +122,52 @@
      run([bash, '-lc', 'bash build.sh'], env=env)
  
  
@@ -184761,7 +184829,7 @@ diff --git a/scripts/run_windows.py b/scripts/run_windows.py
  def settings_value(config, key):
      if not config.is_file():
          return None
-@@ -88,6 +156,45 @@
+@@ -88,6 +178,45 @@
      return None
  
  
@@ -184807,7 +184875,7 @@ diff --git a/scripts/run_windows.py b/scripts/run_windows.py
  def configure_frame_rate(env):
      """Windows supports the tested fixed-timestep presets, including old config migration.
  
-@@ -95,6 +202,18 @@
+@@ -95,6 +224,18 @@
      legacy uncapped launch cannot saturate the desktop during menus or loading.
      """
      fps = env.get('BB_FPS', '60')
@@ -184826,7 +184894,7 @@ diff --git a/scripts/run_windows.py b/scripts/run_windows.py
      if fps not in ('30', '60', '90'):
          print(f'Unsupported Windows FPS preset {fps!r}; using 60 FPS.', flush=True)
          fps = '60'
-@@ -103,12 +222,18 @@
+@@ -103,12 +244,18 @@
  
  
  def main():
@@ -184845,7 +184913,7 @@ diff --git a/scripts/run_windows.py b/scripts/run_windows.py
      out.mkdir(parents=True, exist_ok=True)
      os.environ.setdefault('BB_CONFIG', str(data / 'bbport.ini'))
      config = Path(os.environ['BB_CONFIG'])
-@@ -120,6 +245,10 @@
+@@ -120,6 +267,10 @@
          sys.exit(f'Online configuration: {error}')
      if 'BB_FSR411_DIR' not in os.environ and not (ROOT / 'fsr4_411').is_dir() and (data / 'fsr4_411').is_dir():
          os.environ['BB_FSR411_DIR'] = str(data / 'fsr4_411')
@@ -184856,7 +184924,7 @@ diff --git a/scripts/run_windows.py b/scripts/run_windows.py
      # The last folder that worked is remembered, so run.bat alone starts the game afterwards.
      remembered = out / 'game_dir.txt'
      if not game and remembered.is_file():
-@@ -138,39 +267,60 @@
+@@ -138,39 +289,60 @@
                         '--config', os.environ.get('BB_MODS_CONFIG', data / 'mods.json'),
                         '--enabled', os.environ.get('BB_MODS_ENABLED', '1')], capture=True))
      overlay = merged if merged.resolve() != original else None
@@ -184944,7 +185012,20 @@ diff --git a/scripts/run_windows.py b/scripts/run_windows.py
          # Sizes chosen below for the previous launch are recomputed after an in-game restart.
          if os.environ.get('BB_AUTO_RENDER_RES') == '1':
              for key in ('BB_RENDER_RES', 'BB_OUTPUT_RES', 'BB_AUTO_RENDER_RES'):
-@@ -192,14 +342,40 @@
+@@ -181,25 +353,45 @@
+             sizes = run([PYTHON, SCRIPTS / 'patches.py', '--print-scaled', '--settings', config], capture=True, check=False)
+             if sizes and len(sizes.split()) == 2:
+                 scaled_render, scaled_output = sizes.split()
+-        live = '0'
+-        if scaled_output:
+-            live = os.environ.get('BB_LIVE_RES') or settings_value(config, 'live_resolution') or '0'
+-            if live == 'auto':
+-                caps = out / 'bb-gpu-capabilities.exe'
+-                live = run([caps, '--live-resolution'], capture=True, check=False) or '0'
+-            live = '1' if live == '1' else '0'
+-        if live == '1':
++        live = configure_live_resolution(config, out)
++        if live == '1' and scaled_output:
              print(f'Output {scaled_output}: live resolution changes (live_resolution=0: startup patch)')
          elif scaled_output:
              os.environ.update(BB_RENDER_RES=scaled_render, BB_OUTPUT_RES=scaled_output, BB_AUTO_RENDER_RES='1')
@@ -184987,7 +185068,7 @@ diff --git a/scripts/run_windows.py b/scripts/run_windows.py
          probe = ROOT / os.environ.get('BB_PROBE', out / 'bb-probe.exe')
          command = [probe, out / 'boot-linked.bin', '--content-profile', out / 'content.bin',
                     '--patches', out / 'patches.bin', '--app0', merged,
-@@ -208,6 +384,7 @@
+@@ -208,6 +400,7 @@
          # MSYS2's DLLs (libc++, SDL3, FFmpeg, ...). System32 is searched before PATH, so the
          # Vulkan loader stays the one installed with the GPU driver.
          os.environ['PATH'] = os.pathsep.join([str(msys_root() / 'clang64/bin'), os.environ.get('PATH', '')])
@@ -184995,7 +185076,7 @@ diff --git a/scripts/run_windows.py b/scripts/run_windows.py
          print('Starting:', ' '.join(shlex.quote(str(c)) for c in command), flush=True)
          try:
              status = subprocess.call(
-@@ -219,7 +396,9 @@
+@@ -219,7 +412,9 @@
          except KeyboardInterrupt:
              status = 130
          print(f'bb-probe exited with code {status}', flush=True)
@@ -203823,3 +203904,41 @@ new file mode 100644
 +    memcpy(out,path,n+1);memcpy(out+offset,locale,5);return 1;
 +}
 +#endif
+diff --git a/tests/test_upscaler_support.cpp b/tests/test_upscaler_support.cpp
+--- a/tests/test_upscaler_support.cpp
++++ b/tests/test_upscaler_support.cpp
+@@ -28,6 +28,7 @@
+     assert(RenderPreset() == NativeAA && !ResolutionNeedsRestart());
+     s.upscaler = UpscalerFsr3;
+     assert(RenderPreset() == Performance);
++    // This FSR capability matrix assumes the independent DLSS provider is available.
+     for (bool fsr4 : {false, true}) {
+         for (bool fsr411 : {false, true}) {
+             for (int requested = 0; requested < UpscalerCount; ++requested) {
+@@ -39,18 +40,20 @@
+                 s.fsr4_problem = nullptr;
+                 Load();
+                 assert(s.upscaler == requested);
+-                ConfigureUpscalerSupport(fsr4, fsr411);
+-                const bool unsupported = (requested == UpscalerFsr4 && !fsr4) ||
+-                    (requested == UpscalerFsr411 && !(fsr4 && fsr411));
+-                assert(s.upscaler == (unsupported ? UpscalerFsr3 : requested));
++                ConfigureUpscalerSupport(fsr4, fsr411, true);
++                const int expected = requested == UpscalerFsr411 && !(fsr4 && fsr411)
++                    ? (fsr4 ? UpscalerFsr4 : UpscalerFsr3)
++                    : requested == UpscalerFsr4 && !fsr4 ? UpscalerFsr3 : requested;
++                const bool unsupported = expected != requested;
++                assert(s.upscaler == expected);
+                 assert(s.fsr4_supported == fsr4);
+                 assert(s.fsr411_supported == (fsr4 && fsr411));
+                 assert(bool(s.fsr4_problem.load()) == unsupported);
+                 assert(s.preset == Performance && s.output_res == 2);
+                 // Startup patch settings still describe the already applied guest patches.
+                 assert(s.startup_upscaler == requested);
+-                ConfigureUpscalerSupport(fsr4, fsr411);
+-                assert(s.upscaler == (unsupported ? UpscalerFsr3 : requested));
++                ConfigureUpscalerSupport(fsr4, fsr411, true);
++                assert(s.upscaler == expected);
+             }
+         }
+     }

@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -71,16 +71,16 @@ namespace BloodborneLauncher.Core
             var fault = tail.LastOrDefault(l => FaultLine.IsMatch(l)) is { } f ? FaultLine.Match(f) : null;
             if (fault != null)
                 return fault.Groups[1].Value == "Guest"
-                    ? $"The game's own code crashed ({fault.Groups[3].Value}), usually a rare timing race in the game."
-                    : $"The engine crashed in {fault.Groups[3].Value} ({Name(Convert.ToUInt32(fault.Groups[2].Value, 16))}).";
+                    ? BloodborneLauncher.Core.UiText.F($"The game's own code crashed ({fault.Groups[3].Value}), usually a rare timing race in the game.")
+                    : BloodborneLauncher.Core.UiText.F($"The engine crashed in {fault.Groups[3].Value} ({Name(Convert.ToUInt32(fault.Groups[2].Value, 16))}).");
             return code switch
             {
                 23 => "The engine stopped itself on an error (exit code 23); the report has the details.",
                 0xC0000005 => "The engine crashed on a bad memory access (0xC0000005).",
                 0xC0000409 => "The engine stopped on a failed safety check (0xC0000409).",
                 0xC00000FD => "The engine ran out of stack (0xC00000FD).",
-                > 0xFFFF => $"The game closed unexpectedly (0x{code:X8}).",
-                _ => $"The game closed unexpectedly (exit code {code})."
+                > 0xFFFF => BloodborneLauncher.Core.UiText.F($"The game closed unexpectedly (0x{code:X8})."),
+                _ => BloodborneLauncher.Core.UiText.F($"The game closed unexpectedly (exit code {code}).")
             };
         }
 
@@ -114,7 +114,7 @@ namespace BloodborneLauncher.Core
             if (line == null || MemoryLine.Match(line) is not { Success: true } m) return null;
             long free = long.Parse(m.Groups[4].Value), total = long.Parse(m.Groups[5].Value), commit = long.Parse(m.Groups[6].Value);
             return free * 100 < total * 4 || commit < 1024
-                ? $"Windows was nearly out of memory ({free} MiB of {total} MiB free, {commit} MiB commit left): closing other programs or a larger page file helps."
+                ? BloodborneLauncher.Core.UiText.F($"Windows was nearly out of memory ({free} MiB of {total} MiB free, {commit} MiB commit left): closing other programs or a larger page file helps.")
                 : null;
         }
 
@@ -131,22 +131,22 @@ namespace BloodborneLauncher.Core
                 }
             if (first == null || last == null) return null;
             Match a = MemoryLine.Match(first), b = MemoryLine.Match(last);
-            return $"RAM: game {a.Groups[1].Value} MiB at the start, {b.Groups[1].Value} MiB at the end " +
-                   $"({a.Groups[2].Value} → {b.Groups[2].Value} MiB committed, peak {b.Groups[3].Value} MiB); " +
-                   $"PC {b.Groups[4].Value} of {b.Groups[5].Value} MiB free, {b.Groups[6].Value} MiB commit left";
+            return BloodborneLauncher.Core.UiText.F($"RAM: game {a.Groups[1].Value} MiB at the start, {b.Groups[1].Value} MiB at the end ") +
+                   BloodborneLauncher.Core.UiText.F($"({a.Groups[2].Value} → {b.Groups[2].Value} MiB committed, peak {b.Groups[3].Value} MiB); ") +
+                   BloodborneLauncher.Core.UiText.F($"PC {b.Groups[4].Value} of {b.Groups[5].Value} MiB free, {b.Groups[6].Value} MiB commit left");
         }
 
         public static string Build(LauncherSettings s, IniFile ini, int code, int logLines = 150)
         {
             var hw = Hardware.Detect();
             var text = new StringBuilder();
-            text.AppendLine($"Bloodborne Launcher {Updater.CurrentLabel}, engine {Updater.LocalEngine() ?? "unknown"}");
+            text.AppendLine(BloodborneLauncher.Core.UiText.F($"Bloodborne Launcher {Updater.CurrentLabel}, engine {Updater.LocalEngine() ?? "unknown"}"));
             var tail = Tail(GameRunner.SessionLog, 120).ToList();
-            text.AppendLine($"Exit code 0x{EngineCode(tail, code):X}: {Explain(code)}");
-            text.AppendLine($"{hw.Summary}, {hw.RamBytes >> 30} GB RAM, Windows {Environment.OSVersion.Version}");
+            text.AppendLine(BloodborneLauncher.Core.UiText.F($"Exit code 0x{EngineCode(tail, code):X}: {Explain(code)}"));
+            text.AppendLine(BloodborneLauncher.Core.UiText.F($"{hw.Summary}, {hw.RamBytes >> 30} GB RAM, Windows {Environment.OSVersion.Version}"));
             if (RamTrend() is { } ram) text.AppendLine(ram);
-            text.AppendLine($"Upscaler {ini.Get("upscaler")}, preset {ini.Get("preset")}, output {ini.Get("output_res")}, " +
-                            $"FPS {s.Str("fps_mode")}, live resolution {ini.Get("live_resolution")}, mods {(s.Bool("mods_enabled") ? "on" : "off")}");
+            text.AppendLine(BloodborneLauncher.Core.UiText.F($"Upscaler {ini.Get("upscaler")}, preset {ini.Get("preset")}, output {ini.Get("output_res")}, ") +
+                            BloodborneLauncher.Core.UiText.F($"FPS {s.Str("fps_mode")}, live resolution {ini.Get("live_resolution")}, mods {(s.Bool("mods_enabled") ? "on" : "off")}"));
             text.AppendLine("Experimental: " + string.Join(", ", Experimental.Select(k => $"{k[4..].Replace('_', ' ')} {(s.Bool(k) ? "on" : "off")}")));
             text.AppendLine();
             text.AppendLine($"Last {logLines} lines of logs\\last_session.log (repeats folded):");

@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Controls;
 using BloodborneLauncher.Core;
 
@@ -11,14 +11,11 @@ namespace BloodborneLauncher.Views
         private static readonly (string Key, string Label, Type Page)[] Sections = new (string, string, Type)[]
         {
             ("mods", "Mods", typeof(ModsPage)),
-            ("cheats", "Tweaks & Cheats", typeof(CheatsPage)),
-            ("online", "Online", typeof(OnlinePage)),
-            ("advanced", "Advanced", typeof(SettingsPage)),
             ("output", "Log", typeof(OutputPage)),
         };
 
-        private readonly Dictionary<Type, LauncherPage> _pages = new();
-        private readonly Frame _frame = new() { NavigationUIVisibility = System.Windows.Navigation.NavigationUIVisibility.Hidden, Focusable = false };
+        private readonly PageCache<Type, LauncherPage> _pages = new(1,page=>page.Dispose());
+        private readonly ContentControl _frame = new() { Focusable=false,HorizontalContentAlignment=HorizontalAlignment.Stretch,VerticalContentAlignment=VerticalAlignment.Stretch };
         private readonly Segmented _tabs;
         private int _current = -1;
         private System.Windows.Threading.DispatcherOperation? _shownRefresh;
@@ -34,16 +31,16 @@ namespace BloodborneLauncher.Views
             }));
         }
 
-        public MorePage() : base("More", "")
+        public MorePage() : base(BloodborneLauncher.Core.UiText.T("More"), "")
         {
-            _tabs = new Segmented(Sections.Select(s => new Choice(s.Label, s.Key)).ToArray())
+            _tabs = new Segmented(Sections.Select(s => new Choice(s.Label, s.Key)).ToArray(),uniform:true)
             {
                 HorizontalAlignment = HorizontalAlignment.Center,
-                Width = Sections.Length * 104,
-                Margin = new Thickness(0, 6, 0, 2),
+                Width = Sections.Length * 140,
+                // Keep the entire hit area below the 34-DIP native caption strip.
+                Margin = new Thickness(0, 42, 0, 8),
             };
             _tabs.Changed += Open;
-            _frame.Navigated += (_, _) => { while (_frame.CanGoBack) _frame.RemoveBackEntry(); };
 
             var root = new Grid();
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -51,8 +48,13 @@ namespace BloodborneLauncher.Views
             root.Children.Add(_tabs);
             Grid.SetRow(_frame, 1);
             root.Children.Add(_frame);
-            Content = root;
+            Content = BloodborneLauncher.Core.UiText.T(root);
             Open(0);
+            ReleaseWhenDisposed(() => {
+                _shownRefresh?.Abort();
+                _pages.Clear();
+                _frame.Content=null;
+            });
         }
 
         public void ShowSection(string key)
@@ -65,9 +67,9 @@ namespace BloodborneLauncher.Views
         {
             _tabs.Select(index, notify: false);
             var type = Sections[index].Page;
-            if (!_pages.TryGetValue(type, out var page))
-                _pages[type] = page = (LauncherPage)Activator.CreateInstance(type)!;
-            if (_current != index) _frame.Navigate(page);
+            var page=_pages.GetOrCreate(type,()=> (LauncherPage)Activator.CreateInstance(type)!);
+            page.PrepareForDisplay();
+            if (_current != index) { _frame.Content=BloodborneLauncher.Core.UiText.T(page); MainWindow.Instance?.QueueNavigationCleanup(); }
             _current = index;
             RefreshAfterNavigation(page);
         }

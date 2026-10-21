@@ -34,6 +34,8 @@ namespace BloodborneLauncher.Core
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate void CloseFn(IntPtr pad);
 
         private static bool _loaded, _failed, _initialised;
+        private static IntPtr _library;
+        private static VoidFn? _shutdown;
         private static SetHintFn? _setHint;
         private static InitFn? _init;
         private static QuitFn? _quit;
@@ -47,6 +49,9 @@ namespace BloodborneLauncher.Core
         private static ButtonNameFn? _buttonName;
         private static CloseFn? _close;
         private static readonly Dictionary<uint, IntPtr> Open = new();
+        private static readonly HashSet<uint> Seen = new();
+        private static readonly List<uint> Removed = new();
+        private static readonly string?[] ButtonNames = new string?[ButtonCount];
 
         /// <summary>False when the package has no SDL3.dll (the launcher falls back to its own detection).</summary>
         public static bool Available => Load();
@@ -58,11 +63,12 @@ namespace BloodborneLauncher.Core
             {
                 var dll = Path.Combine(Paths.BinariesDir, "SDL3.dll");
                 if (!File.Exists(dll)) { _failed = true; return false; }
-                var lib = NativeLibrary.Load(dll);
+                var lib = _library = NativeLibrary.Load(dll);
                 T Get<T>(string name) where T : Delegate => Marshal.GetDelegateForFunctionPointer<T>(NativeLibrary.GetExport(lib, name));
                 _setHint = Get<SetHintFn>("SDL_SetHint");
                 _init = Get<InitFn>("SDL_InitSubSystem");
                 _quit = Get<QuitFn>("SDL_QuitSubSystem");
+                _shutdown = Get<VoidFn>("SDL_Quit");
                 _gamepads = Get<ListFn>("SDL_GetGamepads");
                 _joysticks = Get<ListFn>("SDL_GetJoysticks");
                 _free = Get<FreeFn>("SDL_free");
@@ -75,10 +81,13 @@ namespace BloodborneLauncher.Core
                 _axis = Get<AxisFn>("SDL_GetGamepadAxis");
                 _buttonName = Get<ButtonNameFn>("SDL_GetGamepadStringForButton");
                 _close = Get<CloseFn>("SDL_CloseGamepad");
+                for(int button=0;button<ButtonCount;button++)
+                    ButtonNames[button]=Marshal.PtrToStringUTF8(_buttonName!(button));
                 _loaded = true;
             }
             catch
             {
+                ReleaseLibrary();
                 _failed = true;
             }
             return _loaded;
@@ -99,11 +108,27 @@ namespace BloodborneLauncher.Core
         /// <summary>Lets go of every pad (before the game starts, or when the page closes).</summary>
         public static void Stop()
         {
-            if (!_initialised) return;
+            if (_library == IntPtr.Zero) return;
             foreach (var pad in Open.Values) _close!(pad);
             Open.Clear();
-            _quit!(InitGamepad);
+            if (_initialised) _quit!(InitGamepad);
+            // SDL belongs only to this launcher's controller preview. The game is another process.
+            _shutdown?.Invoke();
             _initialised = false;
+            ReleaseLibrary();
+        }
+
+        private static void ReleaseLibrary()
+        {
+            // No callback or native pointer may outlive the module reference.
+            var library = _library; _library = IntPtr.Zero;
+            _setHint = null; _init = null; _quit = null; _shutdown = null;
+            _gamepads = null; _joysticks = null; _free = null;
+            _open = null; _nameForId = null; _joystickNameForId = null; _isGamepad = null;
+            _update = null; _button = null; _axis = null; _buttonName = null; _close = null;
+            _loaded = false;
+            Seen.Clear();Removed.Clear();Array.Clear(ButtonNames);
+            if (library != IntPtr.Zero) NativeLibrary.Free(library);
         }
 
         private static List<uint> Ids(ListFn list)
@@ -133,14 +158,42 @@ namespace BloodborneLauncher.Core
 
         /// <summary>The pads' state in coarse form (held buttons, stick positions in eighths). A receiver
         /// stays connected while its pad is switched off, so only a change in this shows the pad is on.</summary>
-        public static string State()
+        public static ulong State()
         {
-            var held = Held();
-            var state = new System.Text.StringBuilder(string.Join(",", held.OrderBy(h => h)));
-            foreach (var pad in Open.Values)
-                for (var axis = 0; axis < 4; axis++)
-                    state.Append('|').Append(_axis!(pad, axis) / 8192);
-            return state.ToString();
+            if(!Start())return 0;
+            _update!();RefreshOpen();
+            ulong state=14695981039346656037UL;
+            foreach(var pair in Open)
+            {
+                // Hash coarse physical values directly: no Held set, strings or LINQ per poll.
+                Mix(ref state,pair.Key);
+                ulong buttons=0;
+                for(int button=0;button<ButtonCount;button++)if(_button!(pair.Value,button))buttons|=1UL<<button;
+                if(_axis!(pair.Value,AxisLeftTrigger)>16000)buttons|=1UL<<ButtonCount;
+                if(_axis!(pair.Value,AxisRightTrigger)>16000)buttons|=1UL<<(ButtonCount+1);
+                Mix(ref state,buttons);
+                for(int axis=0;axis<4;axis++)Mix(ref state,unchecked((ulong)(_axis!(pair.Value,axis)/8192)));
+            }
+            return state;
+        }
+        private static void Mix(ref ulong hash,ulong value) => hash=unchecked((hash^value)*1099511628211UL);
+
+        private static void RefreshOpen()
+        {
+            Seen.Clear();Removed.Clear();
+            var ids=_gamepads!(out int count);
+            try
+            {
+                if(ids!=IntPtr.Zero)for(int index=0;index<count;index++)
+                {
+                    uint id=(uint)Marshal.ReadInt32(ids,index*4);Seen.Add(id);
+                    if(Open.ContainsKey(id))continue;
+                    var pad=_open!(id);if(pad!=IntPtr.Zero)Open[id]=pad;
+                }
+                foreach(var pair in Open)if(!Seen.Contains(pair.Key))Removed.Add(pair.Key);
+                foreach(uint id in Removed) { _close!(Open[id]);Open.Remove(id); }
+            }
+            finally { if(ids!=IntPtr.Zero)_free!(ids); }
         }
 
         /// <summary>The buttons held now on any pad, as SDL names (a, leftshoulder, …, lefttrigger, righttrigger).</summary>
@@ -149,22 +202,11 @@ namespace BloodborneLauncher.Core
             var held = new HashSet<string>();
             if (!Start()) return held;
             _update!();
-            var ids = Ids(_gamepads!);
-            foreach (var gone in Open.Keys.Except(ids).ToList())
+            RefreshOpen();
+            foreach (var pad in Open.Values)
             {
-                _close!(Open[gone]);
-                Open.Remove(gone);
-            }
-            foreach (var id in ids)
-            {
-                if (!Open.TryGetValue(id, out var pad))
-                {
-                    pad = _open!(id);
-                    if (pad == IntPtr.Zero) continue;
-                    Open[id] = pad;
-                }
                 for (var b = 0; b < ButtonCount; b++)
-                    if (_button!(pad, b) && Marshal.PtrToStringUTF8(_buttonName!(b)) is { Length: > 0 } name)
+                    if (_button!(pad, b) && ButtonNames[b] is { Length: > 0 } name)
                         held.Add(name);
                 if (_axis!(pad, AxisLeftTrigger) > 16000) held.Add("lefttrigger");
                 if (_axis!(pad, AxisRightTrigger) > 16000) held.Add("righttrigger");

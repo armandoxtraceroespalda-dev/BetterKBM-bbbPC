@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../../launcher/windows/BloodborneLauncher/Core/GameMenuSoundExtractor.cs" Link="GameMenuSoundExtractor.cs" />
+    <Compile Include="../../../launcher/windows/BloodborneLauncher/Core/MenuSoundExtractionProcess.cs" Link="MenuSoundExtractionProcess.cs" />
+    <Compile Include="../../../launcher/windows/BloodborneLauncher/Core/AssetExtractionProcess.cs" Link="AssetExtractionProcess.cs" />
+    <Compile Include="../../../launcher/windows/BloodborneLauncher/Core/MenuWave.cs" Link="MenuWave.cs" />
+    <ProjectReference Include="../../../launcher/windows/VGAudio.Atrac9/VGAudio.Atrac9.csproj" />
+  </ItemGroup>
+</Project>
