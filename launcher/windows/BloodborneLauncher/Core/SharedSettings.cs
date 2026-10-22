@@ -8,7 +8,7 @@ using System.Text.RegularExpressions;
 namespace BloodborneLauncher.Core
 {
     /// <summary>
-    /// Settings players share: the game and engine options from bbport.ini and the launcher's
+    /// Settings players share: the game and engine options from lantern.ini and the launcher's
     /// game options, as a code to paste in a chat (deflated JSON in base64) or a .json file. What
     /// belongs to this PC or this player stays out: display and HDR, the online account and
     /// servers, folders, languages. Keys are allowlisted both ways, so an imported code can set
@@ -22,6 +22,7 @@ namespace BloodborneLauncher.Core
         private static readonly string[] IniKeys =
         {
             "upscaler", "preset", "sharpen", "sharpness", "show_fps", "show_fps_rate", "show_fps_frame_time", "show_fps_upscaler", "live_resolution", "model_lod", "object_motion",
+            "frame_gen", "frame_gen_cap", "frame_gen_frames", "reflex", "render_scale", "mip_bias", "dlss_preset", "dlss_mip_bias",
             "jitter", "reactive", "widescreen", "pc_controls", "camera_controls", "graphics_controls",
             "change_appearance", "rebirth", "skip_intro",
         };
@@ -35,7 +36,7 @@ namespace BloodborneLauncher.Core
 
         public sealed record Snapshot(SortedDictionary<string, string> Ini, SortedDictionary<string, JsonNode> Launcher, string From);
 
-        /// <summary>A setting an import changes (Launcher: the launcher's, else bbport.ini's); New is null
+        /// <summary>A setting an import changes (Launcher: the launcher's, else lantern.ini's); New is null
         /// for a binding that goes back to its default.</summary>
         public sealed record Change(string Key, string? Old, string? New, Part Part, bool Launcher = false);
 
@@ -193,6 +194,6 @@ namespace BloodborneLauncher.Core
 
         /// <summary>One line for the import summary: "bind.roll: Space → Left Shift".</summary>
         public static string Describe(Change change) =>
-            $"{change.Key}: {change.Old ?? "default"} → {change.New ?? "default"}";
+            $"{change.Key}: {change.Old ?? BloodborneLauncher.Core.UiText.T("default")} → {change.New ?? BloodborneLauncher.Core.UiText.T("default")}";
     }
 }

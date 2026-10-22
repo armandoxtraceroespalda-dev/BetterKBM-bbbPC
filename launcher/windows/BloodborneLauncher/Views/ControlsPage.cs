@@ -16,7 +16,7 @@ namespace BloodborneLauncher.Views
     /// The engine's PC controls: mouse camera and menu pointer, profiles, and the 30 actions, each
     /// stored in bbport.ini bind.*, the same records the in-game Key Bindings menu edits.
     /// Capture accumulates keys and mouse inputs until they are released. A single key
-    /// or mouse input keeps the alternative of the other kind. × removes one,
+    /// or mouse input keeps the alternative of the other kind. The capture dialog clears a binding;
     /// right-click unbinds the action. Inputs used twice, and the port's Insert key, are flagged.
     /// </summary>
     public sealed class ControlsPage : LauncherPage
@@ -116,7 +116,7 @@ namespace BloodborneLauncher.Views
             header.Children.Add(tools);
             Body.Children.Add(header);
 
-            var help = Text(BloodborneLauncher.Core.UiText.Format("Click an action, hold the keys or mouse buttons together and release all to finish. \u00D7 removes a binding, right-click unbinds the action. In the Controller column, pick the button for an action: one already in use swaps over."), "Faint");
+            var help = Text(BloodborneLauncher.Core.UiText.Format("Click an action, hold the keys or mouse buttons together and release all to finish. Use Unbind in the capture dialog to clear the action. In the Controller column, press the button to assign it; buttons already in use swap actions."), "Faint");
             help.Margin = new Thickness(2, 0, 0, 8);
             Body.Children.Add(help);
 
@@ -584,7 +584,7 @@ namespace BloodborneLauncher.Views
             return grid;
         }
 
-        /// <summary>One action's inputs: chips, and the whole cell as a capture button.</summary>
+        /// <summary>One action's keyboard inputs, using the native menu button style.</summary>
         private FrameworkElement Cell(ControlDef control, Dictionary<string, List<ControlDef>> usage)
         {
             var tokens = Bindings.Get(Ini, control).Select(name =>
@@ -596,8 +596,7 @@ namespace BloodborneLauncher.Views
                 return (Value: name, Label: InputMap.Display(name), Mouse: InputMap.IsMouse(name), Warning: warning);
             });
             return new MenuBindingCell(control.Label, tokens, !Bindings.IsDefault(Ini, control),
-                () => BeginCapture(control), () => Store(control, new List<string>()),
-                name => Store(control, Bindings.Get(Ini, control).Where(b => !b.Equals(name, StringComparison.OrdinalIgnoreCase)).ToList()));
+                () => BeginCapture(control), () => Store(control, new List<string>()));
         }
 
         /// <summary>The controller column: the button that does this action, changeable when it is a PS4 button.</summary>
@@ -610,20 +609,31 @@ namespace BloodborneLauncher.Views
                     label = label == "Left stick" ? "Right stick" : label == "Right stick" ? "Left stick" : label;
                 var text = Text(BloodborneLauncher.Core.UiText.T(label), "Faint");
                 text.VerticalAlignment = VerticalAlignment.Center;
+                if (label is "Left stick" or "Right stick")
+                {
+                    // Stick axes are descriptive, not rebindable buttons: no underline or hit target.
+                    text.SetResourceReference(TextBlock.FontFamilyProperty, "BloodborneFont");
+                    text.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
+                    text.FontSize = 12.5;
+                    text.Margin = new Thickness(8, 3, 10, 3);
+                }
                 return text;
             }
             // A chip like the keyboard ones: click and press the button on the pad (a drop-down here
             // opened under the pointer and picked whatever the release landed on).
             var current = PadMap.Main(Ini, input);
+            var menu = PadMap.IsMenu(input);
             var chip = new BloodborneLauncher.Controls.Button
             {
-                Content = current.Length > 0 ? PadMap.DisplayLabel(current) : BloodborneLauncher.Core.UiText.T("Not bound"),
+                Content = current.Length > 0 ? PadMap.DisplayLabel(current) : BloodborneLauncher.Core.UiText.T(menu ? "As in the world" : "Not bound"),
                 Icon = Icon(SymbolRegular.XboxController24),
                 Padding = new Thickness(8, 3, 10, 3),
                 FontSize = 12.5,
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Left,
-                ToolTip = BloodborneLauncher.Core.UiText.F($"The controller button for this action (the game's {PadMap.GameLabel(control.Pad!)}). Click, then press a button on the pad."),
+                ToolTip = menu
+                    ? UiText.T("The controller button that does this in the game's menus, whatever it does in the world. Not set: menus use the buttons as in the world. Click, then press a button on the pad.")
+                    : BloodborneLauncher.Core.UiText.F($"The controller button for this action (the game's {PadMap.GameLabel(control.Pad!)}). Click, then press a button on the pad."),
             };
             if (!PadMap.IsDefault(Ini, input)) chip.FontWeight = FontWeights.SemiBold;
             chip.Click += (_, _) => BeginPadCapture(control, input);

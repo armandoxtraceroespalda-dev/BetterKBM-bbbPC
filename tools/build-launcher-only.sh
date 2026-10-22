@@ -31,5 +31,5 @@ project="$root/launcher/windows/BloodborneLauncher/BloodborneLauncher.csproj"
 "$dotnet_command" clean "$project" -c Release -r win-x64
 "$dotnet_command" publish "$project" -c Release -r win-x64 --self-contained true \
     -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o "$root/LauncherApp"
-printf '\n%s\n' 'Built Bloodborne UI 32. Open LauncherApp/Bloodborne Launcher.exe.'
+printf '\n%s\n' 'Built the integrated Bloodborne launcher. Open LauncherApp/Bloodborne Launcher.exe.'
 printf '%s\n' 'On first start, select your game folder; missing menu assets are generated in LauncherApp/gui.'

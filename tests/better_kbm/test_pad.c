@@ -12,5 +12,12 @@ int main(void){
  char name[64],value[256];assert(runtime_pad_export_binding(IN_CROSS,name,sizeof name,value,sizeof value));assert(!strcmp(name,"cross")&&!strcmp(value,"b"));
  runtime_pad_request_binding(0,0,-2);pc_apply_pad();assert(bindings[IN_CROSS].pad[0]==SDL_GAMEPAD_BUTTON_SOUTH&&bindings[IN_CROSS].keys[0]==key);
  for(int i=0;i<=IN_RIGHT;++i)assert(runtime_pad_export_binding(i,name,sizeof name,value,sizeof value));
+ bindings[IN_MENU_CONFIRM].pad_count=1;bindings[IN_MENU_CONFIRM].pad[0]=SDL_GAMEPAD_BUTTON_EAST;
+ bindings[IN_MENU_BACK].pad_count=1;bindings[IN_MENU_BACK].pad[0]=SDL_GAMEPAD_BUTTON_SOUTH;pc_publish();
+ assert(runtime_pad_export_binding(IN_RIGHT+1,name,sizeof name,value,sizeof value));assert(!strcmp(name,"menu_confirm")&&!strcmp(value,"b"));
+ assert(runtime_pad_export_binding(IN_RIGHT+2,name,sizeof name,value,sizeof value));assert(!strcmp(name,"menu_back")&&!strcmp(value,"a"));
+ runtime_pad_request_binding(0,0,-2);pc_apply_pad();
+ assert(runtime_pad_export_binding(IN_RIGHT+1,name,sizeof name,value,sizeof value)&&!value[0]);
+ assert(runtime_pad_export_binding(IN_RIGHT+2,name,sizeof name,value,sizeof value)&&!value[0]);
  puts("PASS: production controller queue, conflict swaps, factory reset, independent keyboard map and persisted button names.");
 }

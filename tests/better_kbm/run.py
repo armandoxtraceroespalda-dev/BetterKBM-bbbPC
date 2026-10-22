@@ -12,7 +12,7 @@ def main():
  def run(cmd,**kw):subprocess.run(cmd,check=True,**kw)
  with tempfile.TemporaryDirectory(prefix='better-kbm-') as temp:
   root=Path(temp);inp=root/'gpu/shim/input';eng=root/'gpu/shim/engine';inp.mkdir(parents=True);eng.mkdir()
-  for n in ['input.cpp','input.h','compat.h','bindings.cpp','bindings.h','chords.h','pc_controls.cpp','pc_controls.h','ini_bindings.h','mouse_camera_step.h','sprint_turn.h','wheel_buttons.h','menu_pointer.cpp','menu_keyboard_policy.h']:shutil.copy2(engine/'gpu/shim/input'/n,inp/n)
+  for n in ['input.cpp','input.h','compat.h','bindings.cpp','bindings.h','chords.h','pc_controls.cpp','pc_controls.h','ini_bindings.h','mouse_camera_step.h','mouse_camera_stubs.h','sprint_turn.h','wheel_buttons.h','menu_pointer.cpp','menu_keyboard_policy.h']:shutil.copy2(engine/'gpu/shim/input'/n,inp/n)
   for n in ['bbport_settings.h','bbport_overlay.h','bbport_platform.h']:shutil.copy2(here/'fixture'/n,root/'gpu/shim'/n)
   p=root/'gpu/shim/bbport_settings.h';s=p.read_text().replace('bool pc_controls=true','bool keyboard_mouse=true,ds3_profile=true,ingame_tweak_menus=true;int button_prompts=0;\n bool pc_controls=true');s+='\nnamespace BbSettings {enum{PromptsKeyboard=1,PromptsController=2};void ApplyDs3Profile();void SelectKeyboardMouse(bool);void RestoreControllerDefaults();}\n';p.write_text(s)
   for n in ['engine_hooks.h','option_menu.h']:shutil.copy2(here/'fixture'/n,eng/n)
@@ -39,6 +39,13 @@ def main():
   voice_files=root/('voice-files.exe' if os.name=='nt' else 'voice-files')
   run([a.cc,'-std=gnu11','-O0','-ffunction-sections','-fdata-sections','-I'+str(engine/'include'),str(voice_source),'-Wl,--gc-sections','-pthread','-o',str(voice_files)])
   voice_data=root/'voice-data';voice_data.mkdir();run([str(voice_files),str(voice_data)])
+  for name,inc,extra in [
+   ('graphics_settings_sync','gpu/shim',[str(engine/'gpu/shim/bbport_settings.cpp'),str(engine/'gpu/shim/bbport_menu_i18n.cpp')]),
+   ('output_resolution','gpu/shim',[str(engine/'gpu/shim/bbport_settings.cpp'),str(engine/'gpu/shim/bbport_menu_i18n.cpp')]),
+   ('native_live_resolution','start',[])]:
+   binary=root/(name+('.exe' if os.name=='nt' else ''))
+   run([a.cxx,'-std=c++23','-O2','-I'+str(engine/inc),str(here/f'test_{name}.cpp'),*extra,'-o',str(binary)])
+   run([str(binary)])
   settings=root/('movement-settings.exe' if os.name=='nt' else 'movement-settings')
   run([a.cxx,'-std=c++23','-O2','-I'+str(engine/'gpu/shim'),str(here/'test_movement_settings.cpp'),
        str(engine/'gpu/shim/bbport_settings.cpp'),str(engine/'gpu/shim/bbport_menu_i18n.cpp'),'-o',str(settings)])

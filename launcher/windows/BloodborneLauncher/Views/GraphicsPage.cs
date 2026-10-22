@@ -43,8 +43,7 @@ namespace BloodborneLauncher.Views
 
             Group(BloodborneLauncher.Core.UiText.T("Screen"));
             SettingCombo(SymbolRegular.Gauge24, BloodborneLauncher.Core.UiText.T("Frame rate"), BloodborneLauncher.Core.UiText.T("30, 60, 90, 120 and 144 are the game's frame-rate patches for that rate; Uncapped uses the community uncapped patch"), Choices.FpsModes, "fps_mode");
-            IniCombo(SymbolRegular.ResizeLarge24, BloodborneLauncher.Core.UiText.T("Output resolution"),
-                BloodborneLauncher.Core.UiText.T("The upscaler renders below this and fills it in"), Choices.OutputResolutions, "output_res");
+            OutputResolutionRow();
             IniCombo(SymbolRegular.ArrowSync24, BloodborneLauncher.Core.UiText.T("Live resolution change"),
                 BloodborneLauncher.Core.UiText.T("Allow output resolution changes during play. Off saves changes for the next launch. This switch takes effect when the game starts."), Choices.LiveResolution, "live_resolution");
             IniToggle(SymbolRegular.FullScreenMaximize24, BloodborneLauncher.Core.UiText.T("Fullscreen"), BloodborneLauncher.Core.UiText.T("Borderless, so trophy notifications show on top"), "fullscreen");
@@ -76,6 +75,15 @@ namespace BloodborneLauncher.Views
             IniToggle(SymbolRegular.ArrowMove24, BloodborneLauncher.Core.UiText.T("Object motion vectors"), BloodborneLauncher.Core.UiText.T("Less ghosting on characters; costs about 10% FPS"), "object_motion");
             Add(Card(SymbolRegular.DeveloperBoard24, BloodborneLauncher.Core.UiText.T("DLSS"), "", null, out _dlssHint));
 
+            IniCombo(SymbolRegular.Sparkle24,"Frame generation","Generate additional frames using a supported device",Choices.FrameGeneration,"frame_gen");
+            IniToggle(SymbolRegular.Gauge24,"Cap generated frames","Limit generated frames to the selected output rate","frame_gen_cap");
+            IniCombo(SymbolRegular.Image24,"DLSS model","Model preference used on the next game launch",Choices.DlssModels,"dlss_preset");
+            IniCombo(SymbolRegular.Sparkle24,"Generated frames","RTX 40 supports 2x; additional generated frames require RTX 50",Choices.FrameGenFrames,"frame_gen_frames");
+            IniCombo(SymbolRegular.Timer24,"NVIDIA Reflex","Low latency for DLSS frame generation",Choices.Reflex,"reflex");
+            SliderRow(SymbolRegular.ZoomIn24,"Custom render scale","Used with the Custom quality preset: output size divided by this scale",1,3,0.05,
+                ()=>ParseDouble(Ini.Get("render_scale"),1.3),v=>Ini.Set("render_scale",Fmt(v)));
+            SliderRow(SymbolRegular.Image24,"Texture LOD bias","Texture detail bias used by the upscaler",-2,1,0.05,
+                ()=>ParseDouble(Ini.Get("mip_bias"),0),v=>Ini.Set("mip_bias",Fmt(v)));
             Group(BloodborneLauncher.Core.UiText.T("Game effects"));
             Body.Children.Add(Text(BloodborneLauncher.Core.UiText.T("Patches to the game, applied when it starts."), "Faint"));
             IniCombo(SymbolRegular.Cube24, BloodborneLauncher.Core.UiText.T("Model detail"), null, Choices.ModelLod, "model_lod");
@@ -109,7 +117,7 @@ namespace BloodborneLauncher.Views
                 BloodborneLauncher.Core.UiText.T("Frees video memory held by textures the GPU drew, so long sessions don't fill up VRAM and slow down. Recommended: on"),
                 "exp_vram_cleanup");
             SettingToggle(SymbolRegular.Timer24, BloodborneLauncher.Core.UiText.T("Precise frame pacing"),
-                BloodborneLauncher.Core.UiText.T("A high-resolution timer and even spacing between frames: steadier frame times and less VRR flicker. Uses a little CPU. Off by default"),
+                BloodborneLauncher.Core.UiText.T("A high-resolution timer and even spacing between frames: steadier frame times and less VRR flicker. Enabled by default"),
                 "exp_frame_pacing");
             SettingToggle(SymbolRegular.Storage24, BloodborneLauncher.Core.UiText.T("Use more VRAM for textures"),
                 BloodborneLauncher.Core.UiText.T("Keeps textures in video memory up to 80% of the card instead of about 40%, so they aren't thrown out and loaded again (the cause of most stutters on 8 GB cards). Off by default while it is tested"),
@@ -132,12 +140,34 @@ namespace BloodborneLauncher.Views
             SettingToggle(SymbolRegular.Shapes24, BloodborneLauncher.Core.UiText.T("No shader freezes"),
                 BloodborneLauncher.Core.UiText.T("While a new shader compiles, the objects that need it appear a moment later instead of the game freezing. New: turn it off if something stays missing"),
                 "exp_compile_skip");
+            SettingToggle(SymbolRegular.Storage24,"PC memory model",
+                "Lets the GPU read the game's memory in place when supported, with the engine's compatibility fallback", "exp_guest_in_place");
+            SettingToggle(SymbolRegular.FastForward24,"Native draw calls",
+                "Sends supported game draw calls directly to the renderer", "exp_native_calls");
+            SettingToggle(SymbolRegular.Timer24,"Faster loading",
+                "Uses the upstream engine's faster loading path", "exp_fast_loading");
+            SettingToggle(SymbolRegular.Storage24,"Hot memory pages",
+                "Avoids repeatedly watching frequently written memory pages", "exp_hot_pages");
             SettingToggle(SymbolRegular.Run24, BloodborneLauncher.Core.UiText.T("Sharper motion (FSR 4)"),
                 BloodborneLauncher.Core.UiText.T("Uses FSR 4's balanced model at Performance and Ultra Performance: fewer trails behind moving characters, a little more GPU time"),
                 "fsr4_balanced");
 
             Ws.PortChanged += RefreshGraphics;
             ReleaseWhenDisposed(() => Ws.PortChanged -= RefreshGraphics);
+        }
+
+        private void OutputResolutionRow(){
+            string Current()=>Ini.Get("output_res","1920x1080");
+            string Selected()=>Choices.OutputResolutions.Any(c=>c.Value==Current())?Current():"custom";
+            var parts=Current().Split('x');
+            var width=parts.Length==2&&int.TryParse(parts[0],out var w)?w.ToString():"1920";
+            var height=parts.Length==2&&int.TryParse(parts[1],out var h)?h.ToString():"1080";
+            SettingRow? widthRow=null,heightRow=null;
+            void Show(bool show){if(widthRow!=null)widthRow.Visibility=show?Visibility.Visible:Visibility.Collapsed;if(heightRow!=null)heightRow.Visibility=show?Visibility.Visible:Visibility.Collapsed;}
+            void Save(){if(int.TryParse(width,out var x)&&int.TryParse(height,out var y)&&x>=640&&x<=16384&&y>=360&&y<=8640)Ini.Set("output_res",$"{x&~1}x{y&~1}");}
+            ComboRow(SymbolRegular.ResizeLarge24,UiText.T("Output resolution"),UiText.T("The upscaler renders below this and fills it in"),Choices.OutputResolutions,Selected,v=>{Show(v=="custom");if(v=="custom")Save();else Ini.Set("output_res",v);});
+            TextRow(SymbolRegular.ResizeLarge24,UiText.T("Width"),null,"1920",()=>width,v=>{width=v;Save();});widthRow=(SettingRow)Body.Children[^1];
+            TextRow(SymbolRegular.ResizeLarge24,UiText.T("Height"),null,"1080",()=>height,v=>{height=v;Save();});heightRow=(SettingRow)Body.Children[^1];Show(Selected()=="custom");
         }
 
         private void IniSlider(SymbolRegular icon, string title, double min, double max, string key, Panel? into = null,
@@ -171,7 +201,7 @@ namespace BloodborneLauncher.Views
             var value = Ini.Get("upscaler");
             string? hint = value switch
             {
-                "fsr4" => Directory.Exists(Path.Combine(Paths.PortDir, "fsr4_shaders"))
+                "fsr4" => Directory.Exists(Path.Combine(Paths.EngineDir, "fsr4_shaders"))
                     ? "Assets found. GPUs without the needed shader features fall back to FSR 3.1"
                     : "fsr4_shaders is missing from the port folder: the game falls back to FSR 3.1",
                 "fsr411" when Fsr4VkFound() =>
@@ -199,13 +229,13 @@ namespace BloodborneLauncher.Views
 
         /// <summary>The fsr4vk provider the package ships (FSR 4.1.1 on any GPU, vk_fsr4vk.cpp).</summary>
         private static bool Fsr4VkFound() =>
-            File.Exists(Path.Combine(Paths.PortDir, "fsr4vk", "amd_fidelityfx_upscaler_vk.dll"));
+            File.Exists(Path.Combine(Paths.EngineDir, "fsr4vk", "amd_fidelityfx_upscaler_vk.dll"));
 
         private static string Fsr411Dir()
         {
             var env = Environment.GetEnvironmentVariable("BB_FSR411_DIR");
             if (!string.IsNullOrEmpty(env)) return env;
-            var local = Path.Combine(Paths.PortDir, "fsr4_411");
+            var local = Path.Combine(Paths.EngineDir, "fsr4_411");
             return Directory.Exists(local) ? local : Path.Combine(Paths.DataDir, "fsr4_411");
         }
 

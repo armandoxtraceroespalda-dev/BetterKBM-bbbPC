@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
 
@@ -33,8 +33,8 @@ namespace BloodborneLauncher.Core
 
         /// <summary>One line for the UI: "NVIDIA GeForce RTX 5060 (8 GB) · AMD Ryzen 5 5600 (12 threads) · 2560 × 1440 at 165 Hz".</summary>
         public string Summary =>
-            $"{Gpu}{(VramBytes > 0 ? $" ({VramGb} GB)" : "")} · {Cpu} ({Threads} threads) · " +
-            (ScreenWidth > 0 ? $"{ScreenWidth} × {ScreenHeight} at {RefreshHz} Hz" : "display unknown");
+            BloodborneLauncher.Core.UiText.F($"{Gpu}{(VramBytes > 0 ? $" ({VramGb} GB)" : "")} · {Cpu} ({Threads} threads) · ") +
+            (ScreenWidth > 0 ? BloodborneLauncher.Core.UiText.F($"{ScreenWidth} × {ScreenHeight} at {RefreshHz} Hz") : BloodborneLauncher.Core.UiText.T("display unknown"));
 
         private static Hardware? _detected;
         public static void Reset()=>_detected=null;
@@ -147,18 +147,18 @@ namespace BloodborneLauncher.Core
             // 120 needs a fast display, a mid or better GPU and a CPU with 12+ threads (the game's
             // render thread is the limit); 60 otherwise.
             var fps = RefreshHz >= 119 && tier != Tier.Low && Threads >= 12 ? "120" : "60";
-            Setting("Frame rate", "fps_mode", fps, Choices.FpsModes);
+            Setting(BloodborneLauncher.Core.UiText.T("Frame rate"), "fps_mode", fps, Choices.FpsModes);
 
             // Character motion vectors cost about 10%: on for the biggest GPUs, off for the smallest.
-            if (tier == Tier.High) Ini("Object motion vectors", "object_motion", "1", OnOff, "1");
-            if (tier == Tier.Low) Ini("Object motion vectors", "object_motion", "0", OnOff, "1");
+            if (tier == Tier.High) Ini(BloodborneLauncher.Core.UiText.T("Object motion vectors"), "object_motion", "1", OnOff, "1");
+            if (tier == Tier.Low) Ini(BloodborneLauncher.Core.UiText.T("Object motion vectors"), "object_motion", "0", OnOff, "1");
             return changes;
         }
 
-        private static readonly Choice[] OnOff = { new("On", "1"), new("Off", "0") };
+        private static readonly Choice[] OnOff = { new(BloodborneLauncher.Core.UiText.T("On"), "1"), new(BloodborneLauncher.Core.UiText.T("Off"), "0") };
 
         private static string Name(IReadOnlyList<Choice>? names, string value) =>
-            names?.FirstOrDefault(c => c.Value == value)?.Label.Split(" (")[0] ?? (value.Length > 0 ? value : "default");
+            names?.FirstOrDefault(c => c.Value == value)?.Label.Split(" (")[0] ?? (value.Length > 0 ? value : BloodborneLauncher.Core.UiText.T("default"));
 
         // ---------------------------------------------------------------- display mode
 

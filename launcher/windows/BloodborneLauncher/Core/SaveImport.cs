@@ -57,7 +57,7 @@ namespace BloodborneLauncher.Core
         public static string FolderOfFile(string file)
         {
             if (!file.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)) return Path.GetDirectoryName(file)!;
-            var temp = Path.Combine(Path.GetTempPath(), "bbport-save-import-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+            var temp = Path.Combine(Path.GetTempPath(), "lantern-save-import-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"));
             System.IO.Compression.ZipFile.ExtractToDirectory(file, temp);
             return temp;
         }
@@ -148,10 +148,18 @@ namespace BloodborneLauncher.Core
             if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true);
             Directory.CreateDirectory(staging);
             // Only the save's own files: the folder may be Downloads with the save files loose in it.
-            foreach (var file in Directory.GetFiles(from).Where(IsSaveFile))
-                File.Copy(file, Path.Combine(staging, Path.GetFileName(file)));
-            if (Directory.Exists(target)) Directory.Delete(target, recursive: true);
-            Directory.Move(staging, target);
+            try
+            {
+                foreach (var file in Directory.GetFiles(from).Where(IsSaveFile))
+                    File.Copy(file, Path.Combine(staging, Path.GetFileName(file)));
+                if (Directory.Exists(target)) Directory.Delete(target, recursive: true);
+                Directory.Move(staging, target);
+            }
+            finally
+            {
+                // A failed copy leaves no staging folder behind; kept only if it is the one copy left.
+                try { if (Directory.Exists(staging) && Directory.Exists(target)) Directory.Delete(staging, recursive: true); } catch (Exception) { }
+            }
         }
     }
 }

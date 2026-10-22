@@ -18,3 +18,6 @@ inline void SDL_HideCursor(){}inline void SDL_ShowCursor(){}
 enum{SDL_GAMEPAD_BUTTON_COUNT=26,SDL_GAMEPAD_BUTTON_TOUCHPAD=20,SDL_GAMEPAD_AXIS_LEFT_TRIGGER=4,SDL_GAMEPAD_AXIS_RIGHT_TRIGGER=5};
 using SDL_GamepadButton=int;
 inline const char* SDL_GetGamepadStringForButton(int){return "a";}
+
+inline std::uint64_t fixture_sdl_ticks=1000;
+inline std::uint64_t SDL_GetTicks(){return fixture_sdl_ticks;}

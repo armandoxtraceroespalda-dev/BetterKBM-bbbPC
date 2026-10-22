@@ -25,9 +25,9 @@ namespace BloodborneLauncher.Core
         public static GameStatus Inspect(string gameDir)
         {
             if (string.IsNullOrWhiteSpace(gameDir))
-                return new GameStatus(Health.Bad, "No game folder chosen", "", "");
+                return new GameStatus(Health.Bad, BloodborneLauncher.Core.UiText.T("No game folder chosen"), "", "");
             if (!File.Exists(Path.Combine(gameDir, "eboot.bin")))
-                return new GameStatus(Health.Bad, "No eboot.bin in this folder: choose the folder that contains it", "", "");
+                return new GameStatus(Health.Bad, BloodborneLauncher.Core.UiText.T("No eboot.bin in this folder: choose the folder that contains it"), "", "");
 
             var sfo = ReadSfo(Path.Combine(gameDir, "sce_sys", "param.sfo"));
             var title = sfo.GetValueOrDefault("TITLE_ID", "?");
@@ -45,7 +45,7 @@ namespace BloodborneLauncher.Core
                 return new GameStatus(Health.Warning,
                     BloodborneLauncher.Core.UiText.F($"Update 1.09 is needed: put the dumped 1.09 update beside the game as {Path.GetFileName(Path.TrimEndingDirectorySeparator(gameDir))}-UPDATE, or copy it into the game folder (found {version})"), title, version);
             if (title == "?")
-                return new GameStatus(Health.Warning, "sce_sys/param.sfo is missing or unreadable; the game may not start", title, version);
+                return new GameStatus(Health.Warning, BloodborneLauncher.Core.UiText.T("sce_sys/param.sfo is missing or unreadable; the game may not start"), title, version);
 
             return new GameStatus(Health.Good, update != null
                 ? BloodborneLauncher.Core.UiText.F($"Bloodborne {title}, version {version} (update from {Path.GetFileName(update)})")

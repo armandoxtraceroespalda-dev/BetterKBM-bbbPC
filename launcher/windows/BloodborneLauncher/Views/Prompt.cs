@@ -213,7 +213,7 @@ namespace BloodborneLauncher.Views
         /// <summary>The fields' values, or null if cancelled.</summary>
         public static string[]? Ask(string title, string? message, params Field[] fields)
         {
-            var dialog = new Prompt(title, message, fields, "OK", showCancel: true);
+            var dialog = new Prompt(title, message, fields, BloodborneLauncher.Core.UiText.T("OK"), showCancel: true);
             return dialog.ShowDialog() == true ? dialog._boxes.Select(b => b.Text).ToArray() : null;
         }
 
@@ -229,6 +229,6 @@ namespace BloodborneLauncher.Views
         }
 
         public static void Tell(string title, string message) =>
-            new Prompt(title, message, Array.Empty<Field>(), "OK", showCancel: false).ShowDialog();
+            new Prompt(title, message, Array.Empty<Field>(), BloodborneLauncher.Core.UiText.T("OK"), showCancel: false).ShowDialog();
     }
 }

@@ -12,6 +12,7 @@ namespace BloodborneLauncher.Views
         {
             ("mods", "Mods", typeof(ModsPage)),
             ("output", "Log", typeof(OutputPage)),
+            ("engine", "Engine", typeof(EnginePage)),
         };
 
         private readonly PageCache<Type, LauncherPage> _pages = new(1,page=>page.Dispose());

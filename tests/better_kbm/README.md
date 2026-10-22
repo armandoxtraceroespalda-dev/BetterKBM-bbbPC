@@ -1,3 +1,18 @@
+## Integration 17: upstream and output synchronization
+
+The normal runner also tests the production settings serializer/importer,
+external graphics edits, pending local values, comments/unknown keys, custom
+output dimensions, startup snapshots and native live-resolution policy.
+
+```bash
+python3 tests/better_kbm/run.py --engine ../BetterKBM-engine-expanded
+dotnet run --project tests/better_kbm/ini_sync/IniSyncTests.csproj -c Release
+```
+
+The launcher INI fixture covers external edits, default binding deletion, atomic
+saves and retry after failure. No game assets are included. These fixtures do
+not replace a real Windows/Vulkan gameplay test.
+
 ## Current validation: UI32 navigation memory and dark scrollbars
 
 UI32 replaces UI31's automatic-only runtime policy with one pressure-gated
@@ -424,3 +439,16 @@ To replace the launcher's icon, edit
 `launcher/windows/BloodborneLauncher/app.ico` and rebuild the launcher. The
 separate `launcher/windows/LauncherBuilder/app.ico` belongs to the build utility.
 The locally extracted `gui/game-icon.ico` is applied only to the launched game.
+
+Integration 18: `dotnet run --project tests/better_kbm/engine_defaults` exercises
+production launcher settings and environment generation against an older saved
+configuration, including one-time performance-default migration, native-call
+switch precedence, preserved user choices and safe mode. The native suite also
+covers shared graphics settings, fixed/live output dimensions and controller
+camera gating against the beta 5 engine snapshot.
+
+Integration 20 adds `dotnet run --project tests/better_kbm/pad_menu_bindings`:
+production PadMap/IniFile code verifies independent menu/gameplay mappings,
+within-menu swaps, save/load, profile round trips and factory defaults. The native
+pad fixture covers export/reset of both new menu slots. The upstream native
+`tests/test_pipeline_archive.cpp` exercises beta 6's pipeline-archive growth fix.

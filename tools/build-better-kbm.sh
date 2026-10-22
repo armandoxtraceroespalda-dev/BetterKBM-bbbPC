@@ -1,113 +1,97 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Run from MSYS2 CLANG64. Reuses your existing Git clone and preserves its build.
+# Integration 20: a separate engine checkout avoids stale files from prior online layouts.
 set -euo pipefail
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 engine_source="${1:-$root/../BetterKBM-engine}"
-engine_target="${2:-$root/../BetterKBM-engine-expanded}"
+engine_target="${2:-$root/../BetterKBM-engine-beta6}"
+previous="${BB_PREVIOUS_ENGINE:-$root/../BetterKBM-engine-beta5}"
+[[ -d "$previous" ]] || previous="$root/../BetterKBM-engine-expanded"
 tag="v0.4.0-darkizuku-preview.1"
 patch="$root/engine/bbhost-changes.patch"
-if [[ ${MSYSTEM:-} != CLANG64 ]]; then
-    printf '%s\n' 'Open MSYS2 CLANG64 and run this script there.' >&2; exit 1
-fi
-for executable in git cmake ninja clang python3 cygpath; do
+[[ ${MSYSTEM:-} == CLANG64 ]] || { echo 'Open MSYS2 CLANG64 and run this script there.' >&2; exit 1; }
+for executable in git cmake ninja clang python3 cygpath curl; do
     command -v "$executable" >/dev/null || { printf 'Missing dependency: %s\n' "$executable" >&2; exit 1; }
 done
-dotnet_command="$(command -v dotnet.exe || command -v dotnet || true)"
-if [[ -z "$dotnet_command" && -x '/c/Program Files/dotnet/dotnet.exe' ]]; then
-    dotnet_command='/c/Program Files/dotnet/dotnet.exe'
-fi
-[[ -n "$dotnet_command" ]] || { printf '%s\n' 'Install a Windows .NET SDK (8 or newer), or add its dotnet.exe directory to PATH.' >&2; exit 1; }
-git -C "$engine_source" rev-parse --git-dir >/dev/null || { printf 'Not a Git engine clone: %s\n' "$engine_source" >&2; exit 1; }
-# The tag is the engine base recorded by the author in engine/README.md.
-git -C "$engine_source" rev-parse --verify "${tag}^{commit}" >/dev/null
+for header in expat.h nlohmann/json.hpp; do
+    [[ -f "${MINGW_PREFIX:-/clang64}/include/$header" ]] || {
+        echo 'Run: pacman -S --needed mingw-w64-clang-x86_64-expat mingw-w64-clang-x86_64-nlohmann-json' >&2; exit 1;
+    }
+done
+git -C "$engine_source" rev-parse --git-dir >/dev/null
+expected="$(git -C "$engine_source" rev-parse "${tag}^{commit}")"
 if [[ ! -e "$engine_target" ]]; then
     git -C "$engine_source" worktree add --detach "$engine_target" "$tag"
 fi
 engine_target="$(cd -- "$engine_target" && pwd)"
-expected="$(git -C "$engine_source" rev-parse "${tag}^{commit}")"
-actual="$(git -C "$engine_target" rev-parse HEAD)"
-[[ "$expected" == "$actual" ]] || { printf '%s\n' 'Target has a different base. Choose a new empty target directory as argument 2.' >&2; exit 1; }
-git -C "$engine_target" submodule update --init --recursive
+[[ "$expected" == "$(git -C "$engine_target" rev-parse HEAD)" ]] || {
+    echo 'The target has a different engine base. Choose a new empty directory as argument 2.' >&2; exit 1;
+}
 if git -C "$engine_target" apply --reverse --check --ignore-space-change "$patch" 2>/dev/null; then
-    printf '%s\n' 'This integration is already applied; rebuilding it.'
+    echo 'Integration 20 is already applied; rebuilding.'
 elif git -C "$engine_target" apply --check --ignore-space-change "$patch" 2>/dev/null; then
     git -C "$engine_target" apply --whitespace=nowarn --ignore-space-change "$patch"
 else
-    # Try recognized prior releases without resetting settings or local sources.
-    upgraded=0
-    resolution="$root/engine/better-kbm-resolution-update.patch"
-    latest="$root/engine/better-kbm-settings-sync-update.patch"
-    banks="$root/engine/better-kbm-voice-bank-update.patch"
-    voice="$root/engine/better-kbm-voice-track-update.patch"
-    latino="$root/engine/better-kbm-latino-update.patch"
-    language="$root/engine/better-kbm-language-update.patch"
-    wheel="$root/engine/better-kbm-wheel-update.patch"
-    device="$root/engine/better-kbm-device-update.patch"
-    tuning="$root/engine/better-kbm-tuning-update.patch"
-    sprint="$root/engine/better-kbm-sprint-update.patch"
-    motion="$root/engine/better-kbm-motion-update.patch"
-    popup="$root/engine/better-kbm-popup-input-update.patch"
-    previous="$root/engine/better-kbm-image-camera-update.patch"
-    for upgrade in "$resolution" "$latest" "$banks" "$voice" "$latino" "$language" "$wheel" "$device" "$tuning" "$sprint" "$motion" "$popup" "$previous" "$root/engine/better-kbm-panel-update.patch" "$root/engine/better-kbm-menu-update.patch"; do
-        [[ -f "$upgrade" ]] || continue
-        git -C "$engine_target" apply --check --ignore-space-change "$upgrade" 2>/dev/null || continue
-        git -C "$engine_target" apply --whitespace=nowarn --ignore-space-change "$upgrade"
-        applied=("$upgrade")
-        for followup in "$previous" "$popup" "$motion" "$sprint" "$tuning" "$device" "$wheel" "$language" "$latino" "$voice" "$banks" "$latest" "$resolution"; do
-            if git -C "$engine_target" apply --reverse --check --ignore-space-change "$patch" 2>/dev/null; then break; fi
-            if [[ "$followup" != "$upgrade" && -f "$followup" ]] &&
-               git -C "$engine_target" apply --check --ignore-space-change "$followup" 2>/dev/null; then
-                git -C "$engine_target" apply --whitespace=nowarn --ignore-space-change "$followup"
-                applied+=("$followup")
-            fi
-        done
-        if git -C "$engine_target" apply --reverse --check --ignore-space-change "$patch" 2>/dev/null; then
-            upgraded=1; break
-        fi
-        for ((i=${#applied[@]}-1;i>=0;i--)); do
-            git -C "$engine_target" apply --reverse --whitespace=nowarn "${applied[i]}"
-        done
-    done
-    if [[ "$upgraded" != 1 ]]; then
-        printf '%s\n' 'Target differs from recognized integrations. No upgrade was kept; choose a new empty target directory as argument 2.' >&2; exit 1
-    fi
-    printf '%s\n' 'Previous BetterKBM integration upgraded; existing settings preserved.'
+    echo 'The target contains different source changes. Keep it and choose a new empty directory as argument 2.' >&2
+    exit 1
 fi
-
+# Verify actual source bytes, including the renderer, before producing a build stamp.
+python3 "$root/tools/verify-engine-sources.py" "$engine_target" "$root/engine/better-kbm-manifest.json"
+git -C "$engine_target" submodule update --init --recursive
 cp -- "$root/engine/win_compat.h" "$engine_target/gpu/win_compat.h"
-# Avoid Ninja regeneration loops if an archive or checkout had future dates.
-python3 - "$engine_target" <<'PY'
+# Copy player data and provider assets once; never copy old engine binaries or old shader caches.
+python3 - "$previous" "$engine_target" <<'PY'
 from pathlib import Path
-import os,sys,time,subprocess
-root=Path(sys.argv[1]);now=time.time()
-names=subprocess.check_output(['git','-C',str(root),'ls-files','-z','--cached','--others','--exclude-standard']).decode().split('\0')
-for name in names:
-    p=root/name
-    if p.is_file() and p.stat().st_mtime>now:os.utime(p,(now,now))
+import os,sys,shutil,time
+old,new=map(Path,sys.argv[1:])
+if old.resolve()!=new.resolve() and old.is_dir():
+    for name in ['lantern.ini','bbport.ini','mods.json','patches.json','user','mods','network','engine-assets','fsr4_shaders','fsr4_411','fsr4vk','shader-catalog']:
+        src,dst=old/name,new/name
+        if not src.exists():continue
+        files=[src] if src.is_file() else (p for p in src.rglob('*') if p.is_file())
+        for p in files:
+            relative=Path(name) if src.is_file() else Path(name)/p.relative_to(src)
+            if 'cache' in relative.parts or '__pycache__' in relative.parts:continue
+            target=new/relative
+            if not target.exists():
+                target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(p,target)
+if not (new/'lantern.ini').exists() and (new/'bbport.ini').exists():shutil.copy2(new/'bbport.ini',new/'lantern.ini')
+now=time.time()
+for p in new.rglob('*'):
+    if p.is_file() and '.git' not in p.parts and p.stat().st_mtime>now:os.utime(p,(now,now))
 PY
-# Native CMake/Clang needs C:/..., not /c/..., inside CXXFLAGS.
 compat_windows="$(cygpath -m "$engine_target/gpu/win_compat.h")"
 export CFLAGS="${CFLAGS:-} -Wno-error=unused-but-set-global"
 export CXXFLAGS="-include \"$compat_windows\" ${BB_EXTRA_CXXFLAGS:-}"
 (
     cd -- "$engine_target"
+    # Discard cached compiler flags, then let build.sh choose the upstream build options.
     cmake --fresh -S gpu -B out/gpu -G Ninja
     bash build.sh
+    bash tools/fetch_dlss.sh
+    # FSR assets are only needed when selected. Existing assets are reused without replacing them.
+    if grep -Eq '^upscaler[[:space:]]*=[[:space:]]*fsr4[[:space:]]*$' lantern.ini 2>/dev/null; then
+        bash tools/fetch_fsr4_assets.sh
+    fi
+    if grep -Eq '^frame_gen[[:space:]]*=[[:space:]]*dlss[[:space:]]*$' lantern.ini 2>/dev/null; then
+        bash tools/fetch_streamline.sh
+    fi
 )
-[[ -f "$engine_target/out/bb-probe.exe" && -f "$engine_target/out/bb-engine-assets.exe" ]] || {
-    printf '%s\n' 'Expected native executables were not produced.' >&2; exit 1;
-}
-# A source build must also deploy the DLLs needed outside the CLANG64 shell.
+for program in bb-probe.exe bb-engine-assets.exe bb-start.exe bb-shader-lab.exe; do
+    [[ -s "$engine_target/out/$program" ]] || { printf 'Missing built program: %s\n' "$program" >&2; exit 1; }
+done
 python3 "$root/tools/deploy-runtime-dlls.py" "$engine_target/out" --dll-dir /clang64/bin
-python3 - "$engine_target/out/better-kbm-build.json" <<'PY'
+python3 - "$engine_target" <<'PY'
 from pathlib import Path
-import json,sys
-Path(sys.argv[1]).write_text(json.dumps({'integration':'better-kbm-expanded','version':16}),encoding='utf-8')
+import hashlib,json,sys,datetime
+root=Path(sys.argv[1]);out=root/'out'
+stamp={'integration':'better-kbm-expanded','version':20,'upstream':'1ce45ae7747623b9792d54566cd5290a380555a1','upstream_release':'0.9.37 beta 6','built_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+       'executables':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in [out/'bb-probe.exe',out/'bb-start.exe',out/'bb-shader-lab.exe',out/'bb-engine-assets.exe']}}
+(out/'better-kbm-build.json').write_text(json.dumps(stamp),encoding='utf-8')
+print('Verified native build:',stamp['upstream_release'],stamp['upstream'])
 PY
-# ZIP extraction can preserve dates older than existing WPF build outputs.
-# Use the same guarded publisher so native GUI files survive both build routes.
 bash "$root/tools/build-launcher-only.sh"
 printf '\nLauncher: %s\nEngine folder: %s\n' \
     "$(cygpath -w "$root/LauncherApp/Bloodborne Launcher.exe")" "$(cygpath -w "$engine_target")"
-printf '%s\n' 'In the launcher: More > Advanced > Bloodborne PC > Engine folder. Select the engine folder printed above.'
+echo 'IMPORTANT: select the NEW BetterKBM-engine-beta6 folder in the launcher before testing.'
+echo 'The session log must say: BetterKBM native engine integration 20 | upstream 1ce45ae7...'

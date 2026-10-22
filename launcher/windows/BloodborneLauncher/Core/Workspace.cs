@@ -6,9 +6,9 @@ namespace BloodborneLauncher.Core
     public enum LogLevel { Info, Step, Good, Warn, Bad }
 
     /// <summary>
-    /// The launcher's shared state: settings, bbport.ini, the game process and its output, and the
+    /// The launcher's shared state: settings, lantern.ini, the game process and its output, and the
     /// activity log. Every edit calls SaveSoon, so nothing waits for the window to close and an
-    /// in-game change to bbport.ini is only overwritten by a change made here.
+    /// in-game change to lantern.ini is only overwritten by a change made here.
     /// </summary>
     public sealed class Workspace
     {
@@ -48,6 +48,8 @@ namespace BloodborneLauncher.Core
         public SessionStats? Session { get; private set; }
         /// <summary>The game ended by itself with an error (not stopped from here): exit code and session.</summary>
         public event Action<int, SessionStats>? GameCrashed;
+        /// <summary>The game ended after The Hunter's Dream refused this PC's sign-in: account name and reason.</summary>
+        public event Action<string, string>? SignInRefused;
         private bool _stopping;
 
         public void Initialise()
@@ -102,6 +104,16 @@ namespace BloodborneLauncher.Core
                     }
                     if (code != 0 && !stopped)
                         GameCrashed?.Invoke(code, session);
+                    // The server refused the account's token (the session log's THD line): kept until the
+                    // player signs in again, so the Online page marks the account, and told now.
+                    if (session.SignInRefused is { } refused)
+                    {
+                        var name = refused.Name.Length > 0 ? refused.Name : Settings.Str("hd_name");
+                        Settings.Set("hd_refused", refused.Reason);
+                        SaveSoon();
+                        Log($"The Hunter's Dream refused the sign-in as {name} ({refused.Reason}): sign in again on the Online page.", LogLevel.Warn);
+                        SignInRefused?.Invoke(name, refused.Reason);
+                    }
                 }
                 GameStateChanged?.Invoke();
             });
@@ -134,6 +146,13 @@ namespace BloodborneLauncher.Core
             }
 
             Ini.Load();
+            // Move the old launcher-only DLSS preference into the shared runtime settings once.
+            if (!Settings.Bool("dlss_ini_migrated_18") && Paths.IsPortDir(Paths.PortDir))
+            {
+                if (!Ini.Values.Any(pair => pair.Key == "dlss_preset") && Settings.Str("dlss_preset") is { Length: > 0 } preset)
+                    Ini.Set("dlss_preset", preset);
+                Settings.Set("dlss_ini_migrated_18", true);
+            }
             _iniWarned = false;
             PortChanged?.Invoke();
         }
@@ -162,13 +181,13 @@ namespace BloodborneLauncher.Core
                     ? Latest
                     : null;
                 if (Update != null)
-                    Log($"Launcher update available: {Update.Tag} (you have {Updater.CurrentLabel}).", LogLevel.Good);
+                    Log(BloodborneLauncher.Core.UiText.F($"Launcher update available: {Update.Tag} (you have {Updater.CurrentLabel})."), LogLevel.Good);
                 else if (!quiet)
-                    Log(Latest == null ? "No launcher release is published yet." : $"The launcher is up to date ({Updater.CurrentLabel}).", LogLevel.Good);
+                    Log(Latest == null ? BloodborneLauncher.Core.UiText.T("No launcher release is published yet.") : BloodborneLauncher.Core.UiText.F($"The launcher is up to date ({Updater.CurrentLabel})."), LogLevel.Good);
             }
             catch (Exception e)
             {
-                if (!quiet) Log("Could not check for updates: " + e.GetBaseException().Message, LogLevel.Warn);
+                if (!quiet) Log(BloodborneLauncher.Core.UiText.T("Could not check for updates: ") + e.GetBaseException().Message, LogLevel.Warn);
             }
             UpdateStateChanged?.Invoke();
         }
@@ -215,10 +234,13 @@ namespace BloodborneLauncher.Core
             _saveTimer.Start();
         }
 
+        private string? _saveError;
+
         public void SaveNow()
         {
             if (RenderAudit.Enabled) return;
             _saveTimer?.Stop();
+            _saveError=null;
             try
             {
                 Settings.Save();
@@ -233,7 +255,8 @@ namespace BloodborneLauncher.Core
             }
             catch (Exception e)
             {
-                Log(BloodborneLauncher.Core.UiText.Format("Could not save settings: {0}",e.Message), LogLevel.Bad);
+                _saveError=BloodborneLauncher.Core.UiText.Format("Could not save settings: {0}",e.Message);
+                Log(_saveError,LogLevel.Bad);
             }
         }
 
@@ -243,6 +266,7 @@ namespace BloodborneLauncher.Core
         public string? StartGame()
         {
             SaveNow();
+            if(_saveError!=null)return _saveError;
             OutputLines.Clear();
             OutputCleared?.Invoke();
             if (Settings.Bool("save_backups"))

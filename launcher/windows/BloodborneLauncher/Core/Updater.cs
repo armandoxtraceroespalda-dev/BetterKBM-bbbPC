@@ -9,7 +9,7 @@ namespace BloodborneLauncher.Core
 {
     /// <summary>
     /// Updates from the GitHub releases of the repository. Each release carries the whole package
-    /// (BloodbornePC-*.zip), the launcher on its own ("Bloodborne Launcher.exe") and package.json,
+    /// (LanternEngine-*.zip; BloodbornePC-*.zip before beta 9.6), the launcher on its own ("Bloodborne Launcher.exe") and package.json,
     /// which names the engine build inside the package.
     ///
     /// When only the launcher changed, the exe alone is downloaded. When the engine changed (or the
@@ -22,17 +22,19 @@ namespace BloodborneLauncher.Core
     /// </summary>
     public static class Updater
     {
-        public const string Repository = "Awakenchan/BloodBorneButPc";
+        public const string Repository = "Awakenchan/LanternEngine";
         public static string ReleasesPage => $"https://github.com/{Repository}/releases";
 
         /// <summary>The engine build this launcher is made for (package.json "engine").</summary>
-        public const string EngineId = "bbhost-0.4.0-fps49";
+        public const string EngineId = "lantern-fps90";
 
-        private const string ExeName = "Bloodborne Launcher.exe";
+        public const string ExeName = "Lantern Engine.exe";
+        /// <summary>The launcher's name before 0.9.34 beta 8 (now a forwarder to ExeName).</summary>
+        public const string OldExeName = "Bloodborne Launcher.exe";
         private const string PackageFile = "package.json";
 
         /// <summary>Files and folders of the player's that a package update never touches.</summary>
-        private static readonly string[] Kept = { "bbport.ini", "mods.json", "patches.json", "user", "mods", "logs", "network", "engine-assets" };
+        private static readonly string[] Kept = { "lantern.ini", "bbport.ini", "mods.json", "patches.json", "user", "mods", "logs", "network", "engine-assets" };
 
         public sealed record Release(Version Version, int Beta, string Tag, string Name, string Notes, string Page,
             string? ExeUrl, string? ZipUrl, string? PackageUrl, long ExeSize, long ZipSize, DateTime Published = default)
@@ -68,7 +70,9 @@ namespace BloodborneLauncher.Core
             _ => CurrentBeta > 0,
         };
 
-        public static string Label(Version version, int beta) => beta > 0 ? $"v{version} beta {beta}" : $"v{version}";
+        public static string Label(Version version, int beta) =>
+            beta <= 0 ? $"v{version}"
+            : beta % 100 == 0 ? $"v{version} beta {beta / 100}" : $"v{version} beta {beta / 100}.{beta % 100}";
 
         /// <summary>Orders builds: by version, and a version's betas before its stable release.</summary>
         public static int Compare(Version a, int betaA, Version b, int betaB)
@@ -168,8 +172,11 @@ namespace BloodborneLauncher.Core
                 var name = asset.GetProperty("name").GetString() ?? "";
                 var url = asset.GetProperty("browser_download_url").GetString();
                 var size = asset.GetProperty("size").GetInt64();
-                // GitHub stores "Bloodborne Launcher.exe" as "Bloodborne.Launcher.exe".
-                if (name.Replace(".", " ").Replace(" exe", ".exe").Equals(ExeName, StringComparison.OrdinalIgnoreCase))
+                // GitHub stores "Lantern Engine.exe" as "Lantern.Engine.exe". A release before the
+                // rename has only the old name.
+                var spaced = name.Replace(".", " ").Replace(" exe", ".exe");
+                if (spaced.Equals(ExeName, StringComparison.OrdinalIgnoreCase) ||
+                    (exe == null && spaced.Equals(OldExeName, StringComparison.OrdinalIgnoreCase)))
                     (exe, exeSize) = (url, size);
                 else if (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) && zip == null)
                     (zip, zipSize) = (url, size);
@@ -196,8 +203,12 @@ namespace BloodborneLauncher.Core
             var marker = text.IndexOf("-beta", StringComparison.OrdinalIgnoreCase);
             if (marker > 0)
             {
-                var digits = new string(text[(marker + 5)..].Where(char.IsDigit).ToArray());
-                beta = int.TryParse(digits, out var n) && n > 0 ? n : 1;
+                // "beta.9" and "beta.9.1" (a small update to beta 9): kept as 900 and 901, so 9 <
+                // 9.1 < 10. Launchers before 9.1 read "9.1" as 91, which is newer too: they update.
+                var parts = text[(marker + 5)..].TrimStart('.', '-', ' ').Split('.', '-', ' ', '+');
+                var major = parts.Length > 0 && int.TryParse(parts[0], out var a) && a > 0 ? a : 1;
+                var minor = parts.Length > 1 && int.TryParse(parts[1], out var b) && b is > 0 and < 100 ? b : 0;
+                beta = major * 100 + minor;
             }
             var cut = text.IndexOfAny(new[] { '-', '+', ' ' });
             if (cut > 0) text = text[..cut];
@@ -242,7 +253,7 @@ namespace BloodborneLauncher.Core
             var folder = Path.GetDirectoryName(self)!;
             // A folder of its own each time: one an antivirus still holds a file in (from an earlier
             // attempt) cannot be deleted, and must not stop this one.
-            var parent = Path.Combine(Path.GetTempPath(), "bbport-launcher-update");
+            var parent = Path.Combine(Path.GetTempPath(), "lantern-engine-update");
             if (Directory.Exists(parent))
             {
                 foreach (var old in Directory.GetDirectories(parent).Append(parent))

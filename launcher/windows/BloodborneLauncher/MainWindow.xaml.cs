@@ -362,7 +362,7 @@ namespace BloodborneLauncher
             foreach (var (key,label) in new[] {
                 ("home","Start"),("play","Game"),("display","Display"),("graphics","Graphics"),
                 ("controls","Controls"),("cheats","Tweaks"),("online","Online"),
-                ("trophies","Achievements"),("mods","More"),("advanced","Settings") })
+                ("trophies","Achievements"),("advanced","Settings"),("mods","More") })
             {
                 var button=new System.Windows.Controls.Button { Content=BloodborneLauncher.Core.UiText.T(PcText.Get(label)),MinHeight=48,
                     VerticalAlignment=VerticalAlignment.Stretch,HorizontalContentAlignment=HorizontalAlignment.Center };

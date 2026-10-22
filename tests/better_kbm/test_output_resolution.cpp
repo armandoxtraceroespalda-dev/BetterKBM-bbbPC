@@ -28,15 +28,15 @@ int main() {
         assert(RenderOutput() == startup);
         assert(ResolutionNeedsRestart() == (output != startup));
     }
-    s.output_res = 2; // A new requested 2560x1440 size is saved without changing the applied output.
+    s.output_res = 3; // A new requested 2560x1440 size is saved without changing the applied output.
     Save();
     std::ifstream file(path); std::string saved{std::istreambuf_iterator<char>(file), {}};
     assert(saved.find("output_res=2560x1440") != std::string::npos && saved.find("bind.roll=Space") != std::string::npos);
     assert(RenderOutput() == startup);
-    Load(); assert(RenderOutput() == 2 && !ResolutionNeedsRestart());
+    Load(); assert(RenderOutput() == 3 && !ResolutionNeedsRestart());
     s.live_resolution = 1;
     s.output_res = startup;
-    assert(!LiveOutputChangesEnabled() && RenderOutput() == 2); // Toggle changes also wait for the next launch.
+    assert(!LiveOutputChangesEnabled() && RenderOutput() == 3); // Toggle changes also wait for the next launch.
 
     config("1920x1080", "1");
     assert(LiveOutputChangesEnabled());
@@ -48,17 +48,17 @@ int main() {
     config("1920x1080", "auto");
     for (const char* resolved : {"0", "1"}) {
         setenv("BB_LIVE_RES", resolved, 1);
-        s.output_res = 2;
+        s.output_res = 3;
         assert(LiveOutputChangesEnabled() == (resolved[0] == '1'));
-        assert(RenderOutput() == (resolved[0] == '1' ? 2 : s.startup_output_res));
+        assert(RenderOutput() == (resolved[0] == '1' ? 3 : s.startup_output_res));
     }
     setenv("BB_RENDER_RES", "1706x960", 1);
     assert(!LiveOutputChangesEnabled() && RenderOutput() == s.startup_output_res && ResolutionNeedsRestart());
     unsetenv("BB_RENDER_RES"); unsetenv("BB_LIVE_RES");
     config("2560x1440", "0", "taa");
-    assert(RenderPreset() == NativeAA && RenderOutput() == 2);
+    assert(RenderPreset() == NativeAA && RenderOutput() == 3);
     s.output_res = 1;
-    assert(RenderOutput() == 2 && ResolutionNeedsRestart());
+    assert(RenderOutput() == 3 && ResolutionNeedsRestart());
     std::remove(path);
     std::puts("PASS: Off/native 1080p, startup snapshots, saved pending output, restart, On, resolved Auto, environment overrides, fixed guest size and TAA.");
 }

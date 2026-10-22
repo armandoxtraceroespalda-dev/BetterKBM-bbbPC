@@ -42,8 +42,8 @@ namespace BloodborneLauncher.Core
             new("gestures", "Gestures", "Menus", "", "G", "Touchpad (left)"),
             new("personal_effects", "Personal effects", "Menus", "", "Tab", "Touchpad (right)"),
             new("menu", "Menu", "Menus", "", "Escape", "Options"),
-            new("confirm", "Confirm in menus", "Menus", "", "Return", null),
-            new("back", "Back in menus", "Menus", "", "Backspace", null),
+            new("confirm", "Confirm in menus", "Menus", "", "Return", "Menu confirm"),
+            new("back", "Back in menus", "Menus", "", "Backspace", "Menu back"),
             new("look_up", "Look up", "Camera keys", "The camera without the mouse", "I", "Right stick"),
             new("look_down", "Look down", "Camera keys", "", "K", "Right stick"),
             new("look_left", "Look left", "Camera keys", "", "J", "Right stick"),
@@ -62,17 +62,51 @@ namespace BloodborneLauncher.Core
 
         /// <summary>A friendly name for a chip.</summary>
         public static string Display(string name) => BindingExpressions.IsChord(name)?string.Join(" + ",BindingExpressions.Atoms(name).Select(Display)):DisplaySingle(name);
+        // Translate only known input names. Letters and saved SDL tokens remain literal data.
+        private static readonly Dictionary<string, string> KeyDisplayNames = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Space"] = "Space",
+            ["Return"] = "Return",
+            ["Escape"] = "Escape",
+            ["Backspace"] = "Backspace",
+            ["Tab"] = "Tab",
+            ["CapsLock"] = "CapsLock",
+            ["Left Shift"] = "Left Shift",
+            ["Right Shift"] = "Right Shift",
+            ["Left Ctrl"] = "Left Ctrl",
+            ["Right Ctrl"] = "Right Ctrl",
+            ["Left Alt"] = "Left Alt",
+            ["Right Alt"] = "Right Alt",
+            ["Left GUI"] = "Left GUI",
+            ["Right GUI"] = "Right GUI",
+            ["Application"] = "Application",
+            ["Up"] = "Up",
+            ["Down"] = "Down",
+            ["Left"] = "Left",
+            ["Right"] = "Right",
+            ["Insert"] = "Insert",
+            ["Delete"] = "Delete",
+            ["Home"] = "Home",
+            ["End"] = "End",
+            ["PageUp"] = "PageUp",
+            ["PageDown"] = "PageDown",
+            ["PrintScreen"] = "PrintScreen",
+            ["ScrollLock"] = "ScrollLock",
+            ["Pause"] = "Pause",
+            ["Numlock"] = "Numlock",
+            ["NonUSBackslash"] = "NonUSBackslash",
+        };
         private static string DisplaySingle(string name) => name.ToLowerInvariant() switch
         {
-            "mouse1" => "Left click",
+            "mouse1" => BloodborneLauncher.Core.UiText.T("Left click"),
             // SDL numbering, as the engine reads it (input.cpp): 2 is the middle button, 3 the right.
-            "mouse2" => "Middle click",
-            "mouse3" => "Right click",
-            "mouse4" => "Mouse 4",
-            "mouse5" => "Mouse 5",
-            "wheelup" => "Wheel up",
-            "wheeldown" => "Wheel down",
-            _ => name,
+            "mouse2" => BloodborneLauncher.Core.UiText.T("Middle click"),
+            "mouse3" => BloodborneLauncher.Core.UiText.T("Right click"),
+            "mouse4" => BloodborneLauncher.Core.UiText.T("Mouse 4"),
+            "mouse5" => BloodborneLauncher.Core.UiText.T("Mouse 5"),
+            "wheelup" => BloodborneLauncher.Core.UiText.T("Wheel up"),
+            "wheeldown" => BloodborneLauncher.Core.UiText.T("Wheel down"),
+            _ => KeyDisplayNames.TryGetValue(name, out var label) ? UiText.T(label) : name,
         };
 
         public static List<string> Split(string value) =>
@@ -170,7 +204,7 @@ namespace BloodborneLauncher.Core
         }
     }
 
-    /// <summary>The bindings in bbport.ini (bind.&lt;action&gt;), as the engine and its own menu keep them.</summary>
+    /// <summary>The bindings in lantern.ini (bind.&lt;action&gt;), as the engine and its own menu keep them.</summary>
     public static class Bindings
     {
         public static string IniKey(ControlDef c) => "bind." + c.Name;

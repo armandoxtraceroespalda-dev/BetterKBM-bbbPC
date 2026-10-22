@@ -194,22 +194,14 @@ namespace BloodborneLauncher.Views
 
         private async Task TestAsync()
         {
-            const string host = "srv.shadps4.net", port = "31313", webapi = "http://srv.shadps4.net:31315";
+
 
             _results.Children.Clear();
             _test.IsEnabled = false;
             _test.Content = BloodborneLauncher.Core.UiText.T("Testing…");
             try
             {
-                var results = await Online.CheckAsync(Online.GameServer(Ini.Get("online_game_api")), $"{host}:{port}", webapi);
-                var p2p = int.TryParse(Ini.Get("online_p2p_port").Trim(), out var pinned) && pinned is > 0 and < 65536 ? pinned : 3658;
-                // Not while the game plays: the ping carries the account name and could point the
-                // server at the launcher's port instead of the game's.
-                if (!Ws.Game.Running && await Online.CheckUdpAsync(host, int.TryParse(port, out var tcp) ? tcp : 31313,
-                        Ini.Get("online_username").Trim(), p2p) is { } udp)
-                    results.Add(udp);
-                else
-                    Ws.Log(BloodborneLauncher.Core.UiText.T("Co-op UDP: no answer outside the game (the server answers signed-in players); summons are the real test"), LogLevel.Info);
+                var results = await Online.CheckAsync(Online.GameServer(Ini.Get("online_game_api")));
                 foreach (var r in results)
                 {
                     var said = r.Ok ? (r.Detail.Length > 0 ? BloodborneLauncher.Core.UiText.F($"Reachable: {r.Detail}") : "Reachable") : BloodborneLauncher.Core.UiText.F($"Not reachable ({r.Detail})");

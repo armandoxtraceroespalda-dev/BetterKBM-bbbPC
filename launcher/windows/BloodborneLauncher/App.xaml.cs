@@ -7,9 +7,7 @@ namespace BloodborneLauncher
 {
     public partial class App : Application
     {
-        private static readonly string CrashLog = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "bbport-launcher", "crash.log");
+        private static readonly string CrashLog = Path.Combine(Core.Paths.ConfigDir, "crash.log");
 
         protected override async void OnStartup(StartupEventArgs e)
         {
@@ -76,6 +74,11 @@ namespace BloodborneLauncher
 
         private void OnDispatcherException(object sender, DispatcherUnhandledExceptionEventArgs args)
         {
+            // A transient desktop-composition reset does not invalidate the custom shell.
+            if(args.Exception is System.Runtime.InteropServices.COMException {HResult:unchecked((int)0x80263001)}) {
+                args.Handled=true;
+                return;
+            }
             Record("Dispatcher", args.Exception);
             MessageBox.Show(BloodborneLauncher.Core.UiText.F($"{args.Exception.Message}\n\nLogged to:\n{CrashLog}"),
                 BloodborneLauncher.Core.UiText.T("Unexpected error"), MessageBoxButton.OK, MessageBoxImage.Error);

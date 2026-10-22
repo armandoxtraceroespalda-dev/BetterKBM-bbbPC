@@ -112,3 +112,95 @@ reports restart requirements. Explicit BB_LIVE_RES overrides remain supported.
 Changing this setting takes effect on the next game launch. This upgrade changes
 native settings/renderer code: rebuild with tools/build-better-kbm.sh, not only
 the launcher publisher. Native GUI/audio assets and user settings remain local.
+
+## Bloodborne branch: integration 17
+
+Upstream is pinned to `Awakenchan/LanternEngine`
+`7e6482d1525d3a002872f6637d53458eb417ae62` (0.9.37 beta 2, `lantern-fps86`).
+The cumulative patch still applies to `v0.4.0-darkizuku-preview.1`.
+This includes the author's rendering, loading, memory, shader, frame-generation
+and native startup work while retaining the fork's Bloodborne shell, resource
+lifetime policy, custom menus, DS3 profile, chords, regional languages and
+inventory movement. The fork keeps `Bloodborne Launcher.exe`; upstream's
+alternate layouts, update UI and launcher-icon replacement do not replace it.
+
+The native starter adds these CLANG64 dependencies:
+
+```bash
+pacman -S --needed mingw-w64-clang-x86_64-expat mingw-w64-clang-x86_64-nlohmann-json
+bash tools/build-better-kbm.sh
+```
+
+Rebuild the engine as well as the launcher. `better-kbm-upstream-update.patch`
+upgrades integration 16, with the existing chain for recognized earlier builds.
+Unknown local changes stop the engine upgrade instead of being reset. Settings,
+saves and locally extracted GUI/audio assets are preserved. Upstream migrates
+`bbport.ini` to `lantern.ini` and preserves the user's launcher settings folder.
+
+Output resolution is independent of the internal upscaler scene size. Windowed
+client pixels now follow the output, including DPI and fullscreen restoration.
+Both launch routes resolve Live resolution On/Off/Auto, including 1080p/TAA.
+Off keeps startup output until restart. Custom dimensions are tracked separately
+from their shared choice index.
+
+Launcher saves merge changed keys over the latest INI and replace it atomically.
+The running engine observes external graphics edits without resetting startup
+snapshots or overwriting pending local edits. Explicit environment overrides
+keep their precedence. Failed launcher saves prevent starting with stale values.
+
+Image, mod and patch preparation use the native starter. Custom movie/localization
+conversion remains the existing cached Python worker, using bundled
+`tools/python/python.exe`, `BB_PYTHON`, or Windows Python 3 on PATH (`py.exe` or
+`python.exe`). No original game assets are distributed.
+
+Manifest hashes use LF normalization; supported CRLF checkouts are handled by
+the installer's `--ignore-space-change` checks. Validation includes the Windows
+x64 launcher publish, production native input/camera/settings fixtures, starter
+Windows C++ syntax checks and supplied-game hook signatures. These checks do not
+execute Bloodborne/Vulkan or validate interactive WPF on Windows.
+
+## BetterKBM integration 18 (test build)
+
+Pinned upstream: `Awakenchan/LanternEngine` commit
+`0c14d7340466c2ccfdcca237aa8104ecbf1eeadb` (0.9.37 beta 5).
+The cumulative engine patch includes the beta 3–5 renderer, shader compiler,
+HDR/exposure, memory model and runtime updates, while retaining the custom
+controls, menu layout and resolution synchronization. The launcher adopts
+upstream's one-time beta 4 performance-default migration. Native draw calls
+have one controlling setting; the obsolete second switch no longer overrides it.
+
+Run `bash tools/build-better-kbm.sh` from MSYS2 CLANG64 in the launcher checkout.
+Its new default target is `../BetterKBM-engine-beta5`; select that folder in the
+launcher before testing. Existing `BetterKBM-engine-expanded` remains available
+for comparison. Missing settings, saves and provider assets are copied once;
+compiled shaders and old engine executables are not copied. The script verifies
+native source hashes, builds all native tools, deploys runtime dependencies and
+writes executable hashes and upstream revision to `out/better-kbm-build.json`.
+The native starter and renderer both print integration 18 in the session log.
+
+Source builds version the shader cache even without a release `package.json`.
+DLSS Super Resolution is fetched by the build script; FSR 4 and Streamline are
+fetched when selected in the copied configuration. To enable DLSS frame
+generation later, run `bash tools/fetch_streamline.sh` in the engine checkout.
+Actual performance depends on GPU, scene, resolution, upscaler preset and frame
+cap. Compare the same settings and allow shader compilation to finish.
+
+## BetterKBM integration 20 — 0.9.37 beta 6
+
+Upstream commit: `1ce45ae7747623b9792d54566cd5290a380555a1` (`lantern-fps90`).
+The beta 6 changes are merged into the cumulative patch, including the pipeline
+archive writer/reader correction, NVIDIA boost hint, catalog compatibility,
+Linux cache handling, menu-specific controller buttons and save-error logging.
+The custom inventory movement policy and UI19 styling/translations remain intact.
+The native controller export includes the two added menu slots so an in-game save
+or factory reset cannot silently leave their old launcher assignments behind.
+
+The default build target is now `../BetterKBM-engine-beta6`. Existing settings,
+saves and provider/catalog assets are copied once from beta5 (or expanded when
+beta5 is absent); the previous engine remains available. Select the beta6 folder
+in the launcher after building. Both the native starter and renderer print
+integration 20 and the pinned upstream SHA in the session log.
+
+Shader catalog loading now uses the beta 6 logic, but source builds do not ship
+the author's release catalog. Existing catalog assets are preserved when present;
+without a catalog, newly encountered shaders still need their initial compilation.

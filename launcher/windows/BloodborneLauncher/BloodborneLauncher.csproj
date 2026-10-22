@@ -9,14 +9,15 @@
     <AssemblyName>Bloodborne Launcher</AssemblyName>
     <RootNamespace>BloodborneLauncher</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.9.9</Version>
+    <Version>0.9.37.6</Version>
+    <InformationalVersion>0.9.37-beta6+betterkbm.20</InformationalVersion>
     <ApplicationIcon>app.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <RuntimeHostConfigurationOption Include="System.GC.ConserveMemory" Value="7" />
     <!-- Legacy periodic/input policies stay excluded; UI32 has one pressure-gated post-navigation path. -->
-    <Compile Remove="Core/InteractionHeapReclaimer.cs;Core/IdleHeapReclaimer.cs;Core/IdleMemoryReclaimer.cs" />
+    <Compile Remove="Core/InteractionHeapReclaimer.cs;Core/IdleHeapReclaimer.cs;Core/IdleMemoryReclaimer.cs;Views/LauncherTheme.cs;Views/SettingSearch.cs;Views/ComboSearch.cs;Views/DiscordPreview.cs" />
   </ItemGroup>
 
   <ItemGroup>

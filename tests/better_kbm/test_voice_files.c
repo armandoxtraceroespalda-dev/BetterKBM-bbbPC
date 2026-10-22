@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "../../better-engine/src/runtime_file.c"
 #include <assert.h>
+uint64_t host_monotonic_ns(void){static uint64_t now;return ++now;}
+int runtime_thread_is_loader(void){return 0;}
 static int32_t guest_errno;
 int32_t *runtime_errno(void){return &guest_errno;}
 int32_t runtime_guest_errno(int e){return e;}

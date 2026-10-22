@@ -44,6 +44,7 @@ int main(){
  BbPcPad physical{};physical.buttons=0x2000;physical.lx=200;physical.ly=127;
  clear();p=sample(true,physical);assert((p.buttons&0x2000)&&p.lx==200&&!host_keyboard_moving());
  BbSettings::SelectKeyboardMouse(true);
+ fixture_sdl_ticks+=300; // The preceding Back transition has settled.
  key("W");test_front=true;p=sample();assert((p.buttons&0x10)&&p.ly==127&&!host_keyboard_moving());
  test_front=false;settings.mouse_menu=false;p=sample();assert((p.buttons&0x10)&&p.ly==127);
  settings.mouse_menu=true;clear();key("Backspace");p=sample();assert(p.buttons&0x2000);
