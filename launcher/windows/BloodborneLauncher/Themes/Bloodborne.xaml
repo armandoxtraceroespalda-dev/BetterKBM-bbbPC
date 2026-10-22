@@ -93,20 +93,20 @@
     <SolidColorBrush x:Key="SectionHeadingBrush" Color="#FFD7D8D5" />
     <Style x:Key="GroupHeader" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{DynamicResource BloodborneFont}" />
-        <Setter Property="FontSize" Value="25" />
+        <Setter Property="FontSize" Value="21.875" />
         <Setter Property="Foreground" Value="#FFD7D8D5" />
         <Setter Property="Margin" Value="4,24,0,10" />
     </Style>
     <Style x:Key="StatValue" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{DynamicResource BloodborneFont}" />
-        <Setter Property="FontSize" Value="21" />
+        <Setter Property="FontSize" Value="18.375" />
         <Setter Property="Foreground" Value="{StaticResource TextFillColorPrimaryBrush}" />
         <Setter Property="Margin" Value="0,4,0,0" />
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
     <Style x:Key="StatLabel" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{DynamicResource BloodborneFont}" />
-        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontSize" Value="13.125" />
         <Setter Property="Foreground" Value="{StaticResource TextFillColorSecondaryBrush}" />
     </Style>
     <SolidColorBrush x:Key="SliderActiveGoldBrush" Color="#FFB3A072" />
@@ -126,7 +126,7 @@
     <Style x:Key="BloodborneSidebarButton" TargetType="Button">
         <Setter Property="FontFamily" Value="{DynamicResource BloodborneFont}" />
         <Setter Property="Foreground" Value="{StaticResource TextFillColorPrimaryBrush}" />
-        <Setter Property="FontSize" Value="26" /><Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FontSize" Value="22.75" /><Setter Property="Cursor" Value="Hand" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
             <Grid Background="Transparent">
@@ -143,7 +143,7 @@
         </ControlTemplate></Setter.Value></Setter>
     </Style>
     <Style x:Key="BloodbornePlayButton" TargetType="Button" BasedOn="{StaticResource BloodborneSidebarButton}">
-        <Setter Property="FontSize" Value="58" />
+        <Setter Property="FontSize" Value="50.75" />
         <Setter Property="Template"><Setter.Value>
             <ControlTemplate TargetType="Button">
                 <Grid Background="Transparent">
@@ -163,7 +163,7 @@
     <Style x:Key="BloodborneActionButton" TargetType="Button">
         <Setter Property="FontFamily" Value="{DynamicResource BloodborneFont}" />
         <Setter Property="Foreground" Value="{StaticResource TextFillColorPrimaryBrush}" />
-        <Setter Property="FontSize" Value="21" /><Setter Property="MinHeight" Value="36" />
+        <Setter Property="FontSize" Value="18.375" /><Setter Property="MinHeight" Value="36" />
         <Setter Property="Padding" Value="14,6" /><Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template"><Setter.Value>
             <ControlTemplate TargetType="Button"><Grid Background="Transparent">
@@ -207,7 +207,7 @@
         </Setter.Value></Setter>
     </Style>
     <Style TargetType="ComboBox">
-        <Setter Property="FontFamily" Value="{DynamicResource BloodborneFont}" /><Setter Property="FontSize" Value="21" />
+        <Setter Property="FontFamily" Value="{DynamicResource BloodborneFont}" /><Setter Property="FontSize" Value="18.375" />
         <Setter Property="Foreground" Value="{StaticResource TextFillColorPrimaryBrush}" /><Setter Property="MinHeight" Value="38" />
         <Setter Property="ScrollViewer.CanContentScroll" Value="True" />
         <Setter Property="Template"><Setter.Value>
@@ -232,7 +232,7 @@
         </Setter.Value></Setter>
     </Style>
     <Style x:Key="BloodborneSegmentButton" TargetType="Button" BasedOn="{StaticResource BloodborneActionButton}">
-        <Setter Property="FontSize" Value="18" /><Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="FontSize" Value="15.75" /><Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
             <Grid Background="Transparent">
                 <views:MenuControlFrame x:Name="Trim" IsHitTestVisible="False" />
@@ -254,16 +254,15 @@
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <ContentPresenter VerticalAlignment="Center" Margin="0,0,8,0" />
                     <Grid Width="58" Height="34" Background="Transparent">
-                        <Rectangle x:Name="Glow" Fill="{DynamicResource MenuGlowBrush}" Opacity="0" Margin="-10,-5" IsHitTestVisible="False" />
-                        <Border x:Name="Track" CornerRadius="12" Height="24" Margin="4,0" Background="#FF3D4141" VerticalAlignment="Center" />
-                        <Border x:Name="Thumb" Width="18" Height="18" CornerRadius="9" Background="#FFE2E3DE" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="7,0" />
+                        <Border CornerRadius="12" Height="24" Margin="4,0" Background="#FF141617" VerticalAlignment="Center" />
+                        <Border x:Name="Knob" Width="18" Height="18" CornerRadius="9" Background="#FF505354"
+                            HorizontalAlignment="Left" VerticalAlignment="Center" Margin="7,0" />
+                        <views:MenuSwitchGlow x:Name="KnobGlow" Width="58" Height="34" IsHitTestVisible="False" />
                     </Grid>
                 </StackPanel>
                 <ControlTemplate.Triggers>
-                    <Trigger Property="IsChecked" Value="True"><Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right" /><Setter TargetName="Track" Property="Background" Value="{StaticResource SliderActiveGoldBrush}" /></Trigger>
-                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Glow" Property="Opacity" Value="0.7" /></Trigger>
-                    <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Glow" Property="Opacity" Value="0.7" /></Trigger>
-                    <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.4" /></Trigger>
+                    <Trigger Property="IsChecked" Value="True"><Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" /><Setter TargetName="KnobGlow" Property="Active" Value="True" /></Trigger>
+                    <Trigger Property="IsEnabled" Value="False"><Setter TargetName="KnobGlow" Property="Active" Value="False" /><Setter Property="Opacity" Value="0.4" /></Trigger>
                 </ControlTemplate.Triggers>
             </ControlTemplate>
         </Setter.Value></Setter>

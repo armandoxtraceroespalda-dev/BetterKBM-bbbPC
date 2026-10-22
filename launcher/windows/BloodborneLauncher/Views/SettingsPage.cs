@@ -18,7 +18,7 @@ namespace BloodborneLauncher.Views
 #if false // Intentionally disabled; retained as upstream reference.
         private readonly TextBlock _buildHint;
 #endif
-        private readonly StackPanel _customRows = new();
+        private readonly StackPanel _customRows = new OptionRows();
 // Upstream release selection is disabled in this customized launcher.
 #if false // Intentionally disabled; retained as upstream reference.
         private readonly TextBlock _updateHint;
@@ -75,7 +75,7 @@ namespace BloodborneLauncher.Views
             TextRow(SymbolRegular.Code24, BloodborneLauncher.Core.UiText.T("Extra variables"), BloodborneLauncher.Core.UiText.T("NAME=value pairs separated by spaces, passed to the game"), "BB_EXAMPLE=1",
                 () => S.Str("extra_env"), v => S.Set("extra_env", v.Trim()), width: 300);
 
-            Group(BloodborneLauncher.Core.UiText.T("Files"));
+            SettingsColumns.SetTwoColumns(Group(UiText.T("Files")), true);
             Add(Card(SymbolRegular.DocumentSettings20, BloodborneLauncher.Core.UiText.T("Launcher settings"), BloodborneLauncher.Core.UiText.T(Paths.ConfigFile),
                 IconButton(SymbolRegular.Open24, BloodborneLauncher.Core.UiText.T("Open in Explorer"), (_, _) => Paths.OpenFolder(Paths.ConfigDir)), out _));
             Add(Card(SymbolRegular.DocumentSettings20, BloodborneLauncher.Core.UiText.T("Port settings (bbport.ini)"), BloodborneLauncher.Core.UiText.T(Paths.IniPath),
@@ -84,14 +84,13 @@ namespace BloodborneLauncher.Views
                 BloodborneLauncher.Core.UiText.Format("The game\u0027s compiled shaders, kept between starts (a new engine version clears them itself). Clear them if something draws wrong in every save, such as missing skin or hair; the next start compiles them again and stutters for a while"),
                 SmallButton(BloodborneLauncher.Core.UiText.T("Clear"), SymbolRegular.Broom24, (_, _) => ClearShaderCache()), out _));
 
-            Group(BloodborneLauncher.Core.UiText.T("Share settings"));
             Add(Card(SymbolRegular.Share24, BloodborneLauncher.Core.UiText.T("Share your settings"),
                 BloodborneLauncher.Core.UiText.Format("Graphics, effects, camera, controls, cheats and engine options, as a code to paste in Discord or a file. Not included: display and HDR, the online account, folders and languages"),
                 Row(SmallButton(BloodborneLauncher.Core.UiText.T("Copy code"), SymbolRegular.Copy24, (_, _) => CopySettingsCode()),
-                    SmallButton(BloodborneLauncher.Core.UiText.T("Save as file"), SymbolRegular.Save24, (_, _) => SaveSettingsFile())), out _));
+                    SmallButton(BloodborneLauncher.Core.UiText.T("Save as file"), SymbolRegular.Save24, (_, _) => SaveSettingsFile())), out _, wide: true));
             Add(Card(SymbolRegular.ArrowImport24, BloodborneLauncher.Core.UiText.T("Import settings"), BloodborneLauncher.Core.UiText.T("Someone's code or file. You see what changes before anything is applied"),
                 Row(SmallButton(BloodborneLauncher.Core.UiText.T("Paste code"), SymbolRegular.ClipboardPaste24, (_, _) => ImportSettingsCode()),
-                    SmallButton(BloodborneLauncher.Core.UiText.T("Open file"), SymbolRegular.FolderOpen24, (_, _) => ImportSettingsFile())), out _));
+                    SmallButton(BloodborneLauncher.Core.UiText.T("Open file"), SymbolRegular.FolderOpen24, (_, _) => ImportSettingsFile())), out _, wide: true));
 
 // No community/Discord section is presented in this launcher.
 #if false // Intentionally disabled; retained as upstream reference.

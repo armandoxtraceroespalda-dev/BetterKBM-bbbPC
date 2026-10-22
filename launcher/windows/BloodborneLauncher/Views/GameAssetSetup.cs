@@ -42,7 +42,7 @@ public static class GameAssetSetup
         if(cached && !needSounds)return true;
         bool preparingSounds=cached;
         using var cancel=new CancellationTokenSource();
-        var title=new TextBlock { Text=BloodborneLauncher.Core.UiText.T(Text(BloodborneLauncher.Core.UiText.T("Loading…"),"Cargando…")),FontSize=24,Margin=new Thickness(0,0,0,15),Foreground=Brushes.Bisque };
+        var title=new TextBlock { Text=BloodborneLauncher.Core.UiText.T(Text(BloodborneLauncher.Core.UiText.T("Loading…"),"Cargando…")),FontSize=21,Margin=new Thickness(0,0,0,15),Foreground=Brushes.Bisque };
         var status=new TextBlock { Text=preparingSounds ? BloodborneLauncher.Core.UiText.T(Text(BloodborneLauncher.Core.UiText.T("Preparing menu sounds from your game files."),"Preparando los sonidos del menú desde los archivos del juego.")) : BloodborneLauncher.Core.UiText.T(Text(BloodborneLauncher.Core.UiText.T("Preparing menu artwork from your game files."),"Preparando el menú desde los archivos del juego.")),TextWrapping=TextWrapping.Wrap,Margin=new Thickness(0,0,0,15) };
         var bar=new ProgressBar { Minimum=0,Maximum=100,Height=9,Margin=new Thickness(0,0,0,14),Foreground=new SolidColorBrush(Color.FromRgb(167,146,100)) };
         var cancelButton=new Button { Content=BloodborneLauncher.Core.UiText.T(Text(BloodborneLauncher.Core.UiText.T("Cancel"),"Cancelar")),Width=96,HorizontalAlignment=HorizontalAlignment.Right };

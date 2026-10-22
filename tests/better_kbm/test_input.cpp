@@ -3,6 +3,7 @@
 #include "input.cpp"
 #include <cassert>
 #include <iostream>
+#include <thread>
 static bool test_menu=false,test_front=false,test_navigating=false,test_overlay=false,test_capture=false;
 namespace BbOverlay { bool MenuOpen(){return test_overlay;} bool CapturesInput(){return test_overlay;} }
 namespace BbEngine::Options {bool ClickDecides(uint8_t*,int){return false;} void ListUpdate(uint8_t*,bool){} }
@@ -83,8 +84,15 @@ int main(){
  // The DS3 profile uses T for Blood Bullets without binding the title arrows.
  clear();key("T");p=sample();assert(p.buttons&0x10u);
  clear();sample();
+ // Upstream multi-input alternatives coexist with the release-to-finish chord workflow.
+ const auto before_firearm=host_binding_ini_value(kBindFirearm);
+ assert(host_bindings_parse("firearm","X, Left Shift + Mouse3"));
+ clear();sample();key("X");p=sample();assert(p.buttons&0x100);
+ clear();sample();key("Left Shift");mouse_buttons=SDL_BUTTON_RMASK;p=sample();assert(p.buttons&0x100);
+ clear();sample();mouse_buttons=SDL_BUTTON_RMASK;p=sample();assert(!(p.buttons&0x100));
+ clear();sample();assert(host_bindings_parse("firearm",before_firearm.c_str()));
  // Chord capture accumulates until all constituent inputs have been released.
- host_bind_capture_begin(kBindFirearm);clear();sample();
+ host_bind_capture_begin(kBindFirearm);clear();sample();std::this_thread::sleep_for(std::chrono::milliseconds(310));
  host_bind_capture_key(SDL_GetScancodeFromName("Left Shift"));key("Left Shift");host_bind_capture_mouse(3);mouse_buttons=SDL_BUTTON_RMASK;sample();
  assert(host_bind_capturing()==kBindFirearm);key("Left Shift",false);sample();assert(host_bind_capturing()==kBindFirearm);
  mouse_buttons=0;sample();assert(host_bind_capturing()==-1);assert(host_bind_capture_take_done()==kBindFirearm);

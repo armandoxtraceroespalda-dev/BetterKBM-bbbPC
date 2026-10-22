@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><RollForward>Major</RollForward></PropertyGroup>
+ <ItemGroup>
+  <Compile Include="../../../launcher/windows/BloodborneLauncher/Core/ControlProfiles.cs" Link="ControlProfiles.cs" />
+  <Compile Include="../../../launcher/windows/BloodborneLauncher/Core/InputMap.cs" Link="InputMap.cs" />
+  <Compile Include="../../../launcher/windows/BloodborneLauncher/Core/BindingExpressions.cs" Link="BindingExpressions.cs" />
+  <Compile Include="../../../launcher/windows/BloodborneLauncher/Core/PadMap.cs" Link="PadMap.cs" />
+  <Compile Include="../../../launcher/windows/BloodborneLauncher/Core/IniFile.cs" Link="IniFile.cs" />
+  <Compile Include="../../../launcher/windows/BloodborneLauncher/Core/Mods.cs" Link="Mods.cs" />
+  <Compile Include="../../../launcher/windows/BloodborneLauncher/Core/PatchTitles.cs" Link="PatchTitles.cs" />
+  <Compile Include="../../../launcher/windows/BloodborneLauncher/Core/UiText.cs" Link="UiText.cs" />
+  <Compile Include="../../../launcher/windows/BloodborneLauncher/GlobalUsings.cs" Link="GlobalUsings.cs" />
+  <EmbeddedResource Include="../../../launcher/windows/BloodborneLauncher/Localization/*.json" LogicalName="BloodborneLauncher.Localization.%(Filename)%(Extension)" />
+ </ItemGroup>
+</Project>

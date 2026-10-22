@@ -1684,5 +1684,18 @@
   "Bloodborne UI 29. ": "Bloodborne UI 29. ",
   "Bloodborne UI 29. {0}": "Bloodborne UI 29. {0}",
   "Bloodborne UI 29; executable=": "Bloodborne UI 29; executable=",
-  "Monitor & Info": "Monitor & Info"
+  "Monitor & Info": "Monitor & Info",
+  "Cheats are enabled for this session.": "Cheats are enabled for this session.",
+  "Dark Souls 3 PC layout: left click attacks; Shift + left click performs a strong attack; right click or Ctrl fires; E interacts; R uses an item; C uses a Blood Vial; Space dodges or sprints. Scroll to cycle items and Shift + scroll to switch weapons. Keeps your controller bindings.": "Dark Souls 3 PC layout: left click attacks; Shift + left click performs a strong attack; right click or Ctrl fires; E interacts; R uses an item; C uses a Blood Vial; Space dodges or sprints. Scroll to cycle items and Shift + scroll to switch weapons. Keeps your controller bindings.",
+  "Unknown input device in the control profile.": "Unknown input device in the control profile.",
+  "Info": "Info",
+  "Cheater": "Cheater",
+  "Recommended settings": "Recommended settings",
+  "Running for {0}": "Running for {0}",
+  "Error 404: Skill not found.": "Error 404: Skill not found.",
+  "shadNet account": "shadNet account",
+  "Add input": "Add input",
+  "The next input is added to this action without replacing its current bindings.": "The next input is added to this action without replacing its current bindings.",
+  "Keyboard/Mouse": "Keyboard/Mouse",
+  "Keep the last direction briefly while sprint is held. Default: 0 ms. Zero stops immediately.": "Keep the last direction briefly while sprint is held. Default: 0 ms. Zero stops immediately."
 }

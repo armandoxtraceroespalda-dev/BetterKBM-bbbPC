@@ -19,7 +19,8 @@ namespace BloodborneLauncher.Views
     /// </summary>
     public sealed class TrophyToast : Window
     {
-        private static readonly Queue<Trophy> Pending = new();
+        private sealed record Notice(string Name, Grade Grade, bool Achievement, int Id = -1);
+        private static readonly Queue<Notice> Pending = new();
         private static bool _showing;
 
         public static Color GradeColor(Grade grade) => grade switch
@@ -33,7 +34,14 @@ namespace BloodborneLauncher.Views
         /// <summary>Queues a notification (and its sound) for an unlocked trophy.</summary>
         public static void Announce(Trophy trophy)
         {
-            Pending.Enqueue(trophy);
+            Pending.Enqueue(new Notice(trophy.Name, trophy.Grade, true, trophy.Id));
+            if (!_showing) Next();
+        }
+
+        /// <summary>Transient easter-egg popup only; never grant, store or count a trophy.</summary>
+        public static void AnnounceCheater()
+        {
+            Pending.Enqueue(new Notice(UiText.T("Cheater"), Grade.Bronze, false));
             if (!_showing) Next();
         }
 
@@ -55,7 +63,7 @@ namespace BloodborneLauncher.Views
         private readonly string _corner;
         private readonly TranslateTransform _slide = new();
 
-        private TrophyToast(Trophy trophy, string corner)
+        private TrophyToast(Notice trophy, string corner)
         {
             _corner = corner;
             // Crisp text, as the main window's (a window does not inherit them).
@@ -90,6 +98,14 @@ namespace BloodborneLauncher.Views
                 Child = new SymbolIcon { Symbol = SymbolRegular.Trophy24, Filled = true, FontSize = 24, Foreground = new SolidColorBrush(Color.FromRgb(0xF2, 0xF2, 0xF2)) },
                 VerticalAlignment = VerticalAlignment.Center,
             };
+            // The trophy's own picture from the game dump, as the PS4 shows it.
+            if (trophy.Achievement && TrophyIcons.For(Workspace.Current.Settings, trophy.Id) is { } file &&
+                SettingRow.Picture(file, 92) is { } picture)
+            {
+                tile.Background = Brushes.Black;
+                tile.Child = new System.Windows.Controls.Image { Source = picture, Stretch = Stretch.UniformToFill };
+                RenderOptions.SetBitmapScalingMode(tile.Child, BitmapScalingMode.HighQuality);
+            }
 
             var cup = new SymbolIcon
             {
@@ -116,7 +132,7 @@ namespace BloodborneLauncher.Views
 
             var earned = new TextBlock
             {
-                Text = BloodborneLauncher.Core.UiText.T("You have earned a trophy!"),
+                Text = BloodborneLauncher.Core.UiText.T(trophy.Achievement ? "You have earned a trophy!" : "Error 404: Skill not found."),
                 FontFamily = face,
                 FontSize = 13.5,
                 Foreground = new SolidColorBrush(Color.FromRgb(0xC9, 0xCB, 0xCF)),

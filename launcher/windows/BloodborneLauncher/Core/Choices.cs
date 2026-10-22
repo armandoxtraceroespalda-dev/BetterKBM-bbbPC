@@ -28,38 +28,38 @@ namespace BloodborneLauncher.Core
         /// vk_frame_generation.h). Off by default.</summary>
         public static readonly Choice[] FrameGeneration =
         {
-            new(L.T("Off"), "off"),
-            new("FSR 3.1 (2x)", "fsr3", L.T("Needs an upscaler. Not in menus, movies or with HDR output")),
+            new(UiText.T("Off"), "off"),
+            new("FSR 3.1 (2x)", "fsr3", UiText.T("Needs an upscaler. Not in menus, movies or with HDR output")),
             new("DLSS (NVIDIA RTX 40/50)", "dlss",
-                L.T("NVIDIA's frame generation with Reflex: 2x on RTX 40, up to 6x on RTX 50. Needs an upscaler and Hardware-accelerated GPU scheduling. Applied when the game starts")),
+                UiText.T("NVIDIA's frame generation with Reflex: 2x on RTX 40, up to 6x on RTX 50. Needs an upscaler and Hardware-accelerated GPU scheduling. Applied when the game starts")),
         };
 
         /// <summary>frame_gen_frames: DLSS generated frames per real one (more than one: RTX 50).</summary>
         public static readonly Choice[] FrameGenFrames =
         {
-            new("2x", "1", L.T("One generated frame per real one (RTX 40 and 50)")),
-            new("3x", "2", L.T("RTX 50 only")),
-            new("4x", "3", L.T("RTX 50 only")),
-            new("5x", "4", L.T("RTX 50 only")),
-            new("6x", "5", L.T("RTX 50 only")),
+            new("2x", "1", UiText.T("One generated frame per real one (RTX 40 and 50)")),
+            new("3x", "2", UiText.T("RTX 50 only")),
+            new("4x", "3", UiText.T("RTX 50 only")),
+            new("5x", "4", UiText.T("RTX 50 only")),
+            new("6x", "5", UiText.T("RTX 50 only")),
         };
 
         /// <summary>reflex: NVIDIA Reflex low latency while DLSS Frame Generation is loaded.</summary>
         public static readonly Choice[] Reflex =
         {
-            new(L.T("On"), "on", L.T("Lower input lag. Always on while DLSS Frame Generation runs")),
-            new(L.T("On + Boost"), "boost", L.T("Also keeps the GPU clocks up: a little lower lag, more power")),
-            new(L.T("Off"), "off", L.T("Only while DLSS Frame Generation is off")),
+            new(UiText.T("On"), "on", UiText.T("Lower input lag. Always on while DLSS Frame Generation runs")),
+            new(UiText.T("On + Boost"), "boost", UiText.T("Also keeps the GPU clocks up: a little lower lag, more power")),
+            new(UiText.T("Off"), "off", UiText.T("Only while DLSS Frame Generation is off")),
         };
 
         public static readonly Choice[] Presets =
         {
-            new(L.T("Native AA (no upscaling; DLAA with DLSS)"), "0"),
-            new(L.T("Quality (x1.5)"), "1"),
-            new(L.T("Balanced (x1.7)"), "2"),
-            new(L.T("Performance (x2)"), "3"),
-            new(L.T("Ultra Performance (x3)"), "4"),
-            new(L.T("Custom (render scale below)"), "5"),
+            new(UiText.T("Native AA (no upscaling; DLAA with DLSS)"), "0"),
+            new(UiText.T("Quality (x1.5)"), "1"),
+            new(UiText.T("Balanced (x1.7)"), "2"),
+            new(UiText.T("Performance (x2)"), "3"),
+            new(UiText.T("Ultra Performance (x3)"), "4"),
+            new(UiText.T("Custom (render scale below)"), "5"),
         };
 
         public static readonly Choice[] OutputResolutions =
@@ -154,9 +154,14 @@ namespace BloodborneLauncher.Core
         /// <summary>The DLSS model (BB_DLSS_PRESET): NVIDIA's render presets.</summary>
         public static readonly Choice[] DlssModels =
         {
-            new("Transformer (preset K)", "k", "The newer model: steadier thin and moving objects (a weapon on the back, railings)"),
-            new("CNN (preset E)", "e", "The older model: a little faster on RTX 20 and 30 cards, softer and more ghosting in motion"),
-            new("The DLL's default", "default", "Whatever the included DLSS version picks for each quality mode"),
+            new(UiText.T("Auto (per quality)"), "auto", UiText.T("NVIDIA's DLSS 4.5 pairing: K for DLAA, Quality and Balanced, M for Performance, L for Ultra Performance")),
+            new("Transformer (preset K)", "k", UiText.T("The newer model: steadier thin and moving objects (a weapon on the back, railings)")),
+            new("Transformer 2 (preset M)", "m", UiText.T("DLSS 4.5's model for Performance: sharper, a little heavier")),
+            new("Transformer 2 (preset L)", "l", UiText.T("DLSS 4.5's model for Ultra Performance")),
+            new("Transformer (preset J)", "j", UiText.T("Like K, slightly less ghosting and a little more flicker")),
+            new("CNN (preset E)", "e", UiText.T("The older model: a little faster on RTX 20 and 30 cards, softer and more ghosting in motion")),
+            new("CNN (preset F)", "f", UiText.T("The older model for Ultra Performance and DLAA")),
+            new(UiText.T("The DLL's default"), "default", UiText.T("Whatever the included DLSS version picks for each quality mode")),
         };
 
         /// <summary>What opens the port's in-game settings menu (BB_OVERLAY_KEYS).</summary>

@@ -20,17 +20,10 @@ namespace BloodborneLauncher.Views
         private readonly TextBlock _gameHint, _dlcHint, _userHint;
         private readonly SymbolIcon _gameIcon;
         private readonly Button _resetUser, _resetDlc;
-        private readonly TextBlock _playStatus;
-        private readonly DispatcherTimer _clock;
 
         public PlayPage() : base(BloodborneLauncher.Core.UiText.T("Game"), BloodborneLauncher.Core.UiText.T("Check the game folder, choose where saves go, and set the game languages."))
         {
             Group(BloodborneLauncher.Core.UiText.T("Language"));
-            _playStatus = Text("", "Muted");
-            _playStatus.Margin = new Thickness(0, 10, 0, 0);
-            _playStatus.TextWrapping = TextWrapping.Wrap;
-            _playStatus.Visibility = Visibility.Collapsed;
-
             GameLanguages.Ensure(S);
             var languages = new Grid { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 8, 0, 0) };
             languages.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -61,7 +54,6 @@ namespace BloodborneLauncher.Views
                 voices.Margin = compact ? new Thickness(0, 14, 0, 0) : new Thickness(0);
             };
             Body.Children.Add(languages);
-            Body.Children.Add(_playStatus);
 
             _problem = new InfoBar { IsClosable = false, IsOpen = false, Margin = new Thickness(0, 12, 0, 0) };
             Body.Children.Add(_problem);
@@ -69,7 +61,7 @@ namespace BloodborneLauncher.Views
             // Upstream update/Discord cards are intentionally not part of this launcher's UI.
 
             // ==================== Game ====================
-            Group(BloodborneLauncher.Core.UiText.T("Game"));
+            Body.Children.Add(new MenuSurface { Visibility = Visibility.Collapsed });
             var gameCard = Card(SymbolRegular.Folder24, BloodborneLauncher.Core.UiText.T("Game folder"), "", Row(
                 SmallButton(BloodborneLauncher.Core.UiText.T("Browse"), SymbolRegular.FolderOpen24, (_, _) => ChooseGame()),
                 IconButton(SymbolRegular.Open24, BloodborneLauncher.Core.UiText.T("Open in Explorer"), (_, _) => Paths.OpenFolder(GameEnvironment.GameDir(S)))), out _gameHint);
@@ -147,16 +139,11 @@ namespace BloodborneLauncher.Views
                 SmallButton(BloodborneLauncher.Core.UiText.T("Import…"), SymbolRegular.FolderArrowRight24, (_, _) => ImportSaves()), out _));
 
 
-            _clock = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-            _clock.Tick += (_, _) => UpdateRunning();
-            Unloaded += (_, _) => _clock.Stop();
-
             Ws.PortChanged += Refresh;
             ReleaseWhenDisposed(() => Ws.PortChanged -= Refresh);
             Action gameStateChanged = () => { RefreshProfile(); RefreshBackups(); };
             Ws.GameStateChanged += gameStateChanged;
             ReleaseWhenDisposed(() => Ws.GameStateChanged -= gameStateChanged);
-            ReleaseWhenDisposed(() => _clock.Stop());
         }
 
         private StackPanel LanguagePicker(string title, string help, IReadOnlyList<Choice> choices,
@@ -165,14 +152,12 @@ namespace BloodborneLauncher.Views
             var panel = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             var caption = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center,
                 Margin = new Thickness(0, 0, 0, 6) };
-            caption.Children.Add(Text(BloodborneLauncher.Core.UiText.T(PcText.Get(title)), "StatLabel"));
-            var info = Icon(SymbolRegular.Info16);
-            info.FontSize = 12;
-            info.Margin = new Thickness(6, 0, 0, 0);
-            info.VerticalAlignment = VerticalAlignment.Center;
-            info.ToolTip = BloodborneLauncher.Core.UiText.T(PcText.Get(help));
-            ToolTipService.SetInitialShowDelay(info, 150);
-            caption.Children.Add(info);
+            var label = Text(UiText.T(PcText.Get(title)), "StatValue");
+            label.FontSize = 19.25;
+            label.Margin = new Thickness(0);
+            MenuHelp.Attach(label, UiText.T(PcText.Get(help)));
+            MenuHelp.Attach(caption, UiText.T(PcText.Get(help)));
+            caption.Children.Add(label);
             panel.Children.Add(caption);
             var box = new ComboBox { HorizontalAlignment = HorizontalAlignment.Center,
                 MinWidth = 0, MaxDropDownHeight = 360, ToolTip = BloodborneLauncher.Core.UiText.T(PcText.Get(help)) };
@@ -225,28 +210,6 @@ namespace BloodborneLauncher.Views
             RefreshProfile();
             RefreshBackups();
 
-            UpdateRunning();
-        }
-
-        public void UpdateRunning()
-        {
-            var game = Ws.Game;
-            if (game.Running)
-            {
-                var up = DateTime.Now - game.StartedAt;
-                _playStatus.Text = BloodborneLauncher.Core.UiText.F($"Running for {(int)up.TotalMinutes}:{up.Seconds:00}  ·  output on the Game output page");
-                if (IsVisible) _clock.Start(); else _clock.Stop();
-            }
-            else
-            {
-                _clock.Stop();
-                _playStatus.Text = GameCheck.Inspect(GameEnvironment.GameDir(S)).Health == Health.Bad
-                    ? BloodborneLauncher.Core.UiText.T("Choose the game folder first")
-                    : Ws.Session is { Length.TotalSeconds: > 10 } last
-                        ? BloodborneLauncher.Core.UiText.Format("Last session: {0}",last.Summary)
-                        : "";
-            }
-            _playStatus.Visibility = string.IsNullOrEmpty(_playStatus.Text) ? Visibility.Collapsed : Visibility.Visible;
         }
 
         private void OpenDiscord()

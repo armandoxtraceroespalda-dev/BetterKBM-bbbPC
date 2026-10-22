@@ -6,7 +6,7 @@ using System.Windows.Controls;
 namespace BloodborneLauncher.Views
 {
     /// <summary>Monitor selection, FPS counter details and HDR output.</summary>
-    public sealed class DisplayPage : LauncherPage
+    public sealed partial class GraphicsPage : LauncherPage
     {
         private readonly ComboBox _monitor = new() { Width = 450, VerticalAlignment = VerticalAlignment.Center };
         private bool _refreshingMonitors;
@@ -34,14 +34,13 @@ namespace BloodborneLauncher.Views
         }
 
 
-        public DisplayPage() : base(BloodborneLauncher.Core.UiText.T("Display"), BloodborneLauncher.Core.UiText.T("FPS counter and HDR output settings."))
+        private readonly List<SettingRow> _counterRows = new();
+
+        private void BuildMonitorSetting()
         {
-            Group(UiText.T("Monitor & Info"));
             Add(Card(SymbolRegular.Desktop24, BloodborneLauncher.Core.UiText.T("Monitor"),
                 BloodborneLauncher.Core.UiText.T("The game opens here from the start, including fullscreen and HDR. If this monitor is disconnected, the Windows primary monitor is used. Applied on the next launch."),
                 _monitor, out _));
-            var monitorRow=(SettingRow)Body.Children[^1];
-            monitorRow.SizeChanged+=(_,_)=>_monitor.MaxWidth=Math.Max(120,monitorRow.ActualWidth-monitorRow.Padding.Left-monitorRow.Padding.Right-180);
             RefreshMonitors();
             _monitor.SelectionChanged += (_, _) =>
             {
@@ -49,8 +48,19 @@ namespace BloodborneLauncher.Views
                 S.Set("display_device", item.Tag as string ?? "");
                 Ws.SaveSoon();
             };
-            IniToggle(SymbolRegular.DataUsage24, BloodborneLauncher.Core.UiText.T(PcText.Get("Show FPS")), null, "show_fps");
-            // What the counter shows (on unless turned off).
+        }
+
+        private void UpdateCounterOptions()
+        {
+            bool enabled = Ini.Flag("show_fps");
+            foreach (var row in _counterRows) { row.IsEnabled = enabled; row.Opacity = enabled ? 1 : 0.45; }
+        }
+
+        private void BuildInfoSettings()
+        {
+            Group(UiText.T("Info"));
+            IniToggle(SymbolRegular.DataUsage24, UiText.T(PcText.Get("Show FPS")), null,
+                "show_fps", changed: UpdateCounterOptions);
             foreach (var (icon, key, title) in new[]
                      {
                          (SymbolRegular.TopSpeed24, "show_fps_rate", "Frame rate"),
@@ -60,20 +70,31 @@ namespace BloodborneLauncher.Views
                          (SymbolRegular.Gauge24, "show_fps_gpu", "GPU usage"),
                      })
             {
-                // CPU and GPU use are off unless chosen (the engine's defaults, bbport_settings.h).
                 var fallback = key is "show_fps_cpu" or "show_fps_gpu" ? "0" : "1";
-                ToggleRow(icon, BloodborneLauncher.Core.UiText.T(title), BloodborneLauncher.Core.UiText.T("Shown in the FPS counter"), () => Ini.Get(key, fallback) == "1", v => Ini.Set(key, v ? "1" : "0"));
-                ((System.Windows.FrameworkElement)Body.Children[^1]).Margin = new System.Windows.Thickness(24, 0, 0, 4);
+                ToggleRow(icon, UiText.T(title), UiText.T("Shown in the FPS counter"),
+                    () => Ini.Get(key, fallback) == "1", v => Ini.Set(key, v ? "1" : "0"));
+                _counterRows.Add((SettingRow)Body.Children[^1]);
             }
+            UpdateCounterOptions();
+        }
 
+        private readonly List<SettingRow> _hdrRows = new();
+        private void UpdateHdrOptions()
+        {
+            bool enabled = Ini.Flag("hdr");
+            foreach (var row in _hdrRows) { row.IsEnabled = enabled; row.Opacity = enabled ? 1 : 0.45; }
+        }
 
+        private void BuildHdrSettings()
+        {
             Group(BloodborneLauncher.Core.UiText.T("HDR"));
             var hdrHint = WindowsHdr.AnyOn()
                 ? "The game's picture on an HDR screen, with brighter highlights. Applied when the game starts"
                 : WindowsHdr.AnySupported()
                     ? "Turn on Use HDR in Windows' display settings first (Settings › System › Display)"
                     : "This display shows no HDR";
-            IniToggle(SymbolRegular.Hdr24, BloodborneLauncher.Core.UiText.T("HDR output"), BloodborneLauncher.Core.UiText.T(hdrHint), "hdr");
+            IniToggle(SymbolRegular.Hdr24, BloodborneLauncher.Core.UiText.T("HDR output"), BloodborneLauncher.Core.UiText.T(hdrHint), "hdr", changed: UpdateHdrOptions);
+            int firstOption = Body.Children.Count;
             ComboRow(SymbolRegular.Lightbulb24, BloodborneLauncher.Core.UiText.T("HDR source"),
                 BloodborneLauncher.Core.UiText.T("Native: highlights as bright as they are in the game's scene. Expanded: the SDR picture's bright parts made brighter"),
                 Choices.HdrMode, () => Ini.Get("hdr_mode", "native"), v => Ini.Set("hdr_mode", v));
@@ -91,9 +112,11 @@ namespace BloodborneLauncher.Views
                 Choices.HdrUiBrightness, () => Ini.Get("hdr_ui_brightness", "1"), v => Ini.Set("hdr_ui_brightness", v));
             ComboRow(SymbolRegular.Color24, BloodborneLauncher.Core.UiText.T("UI colour"), BloodborneLauncher.Core.UiText.T("Native source only: Vivid shows the HUD and menus with the colours a wide-gamut monitor gives SDR; Exact keeps sRGB's"),
                 Choices.HdrUiColor, () => Ini.Get("hdr_ui_color", "1"), v => Ini.Set("hdr_ui_color", v));
+            _hdrRows.AddRange(Body.Children.Cast<UIElement>().Skip(firstOption).OfType<SettingRow>());
+            UpdateHdrOptions();
 
 
         }
-        public override void OnShown() => RefreshMonitors();
+
     }
 }

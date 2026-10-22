@@ -13,7 +13,7 @@ namespace BloodborneLauncher.Core
     /// it on any paste site, and someone else imports it from the file or the link.
     ///
     /// {
-    ///   "format": "lantern-controls", "version": 1,
+    ///   "format": "lantern-controls", "version": 3, "input_device": "keyboard_mouse",
     ///   "name": "Mouse combat", "author": "someone", "description": "…",
     ///   "bindings": { "attack": "Mouse1", "roll": "Space", "firearm": "X, Mouse2", … }
     /// }
@@ -27,15 +27,16 @@ namespace BloodborneLauncher.Core
         public const string Format = "lantern-controls";
         /// <summary>The format name of profiles exported before 0.9.37 beta 2 (still read).</summary>
         private const string OldFormat = "bbport-controls";
-        public const int Version = 2;
+        public const int Version = 3;
         public const string DarkSouls3Name = "Dark Souls 3 PC";
+        public const string DarkSouls3Help = "Dark Souls 3 PC layout: left click attacks; Shift + left click performs a strong attack; right click or Ctrl fires; E interacts; R uses an item; C uses a Blood Vial; Space dodges or sprints. Scroll to cycle items and Shift + scroll to switch weapons. Keeps your controller bindings.";
         private const int MaxBytes = 64 * 1024;
 
-        /// <summary>Pad: the controller layout (pad.* lines, only inputs off their default); null: the profile leaves the controller alone.</summary>
+        /// <summary>Pad: controller assignments for controller profiles. Keyboard profiles never apply the stored pad map.</summary>
         public sealed record Profile(string Name, string Author, string Description, Dictionary<string, string> Bindings, bool BuiltIn = false, string File = "",
-            Dictionary<string, string>? Pad = null);
+            Dictionary<string, string>? Pad = null, string InputDevice = "keyboard_mouse");
 
-        public sealed record Parsed(Profile Profile, List<string> Notes);
+        public sealed record Parsed(Profile Profile, List<string> Notes, bool DeviceExplicit = false);
 
         public static string Folder => Path.Combine(Paths.ConfigDir, "profiles");
 
@@ -74,23 +75,12 @@ namespace BloodborneLauncher.Core
                     ["confirm"] = "Return",
                     ["back"] = "Backspace",
                 }, BuiltIn: true),
-            new("PC default", "Bloodborne PC", "The engine's own layout: attack on left click, firearm and transform on the mouse too.",
-                DefaultBindings(), BuiltIn: true),
-            new("Mouse focus", "Bloodborne PC", "Both attacks and lock on on the mouse: left click attack, right click strong attack, " +
-                "middle click lock on; firearm F, quick item V.",
-                new Dictionary<string, string>(DefaultBindings())
-                {
-                    ["attack"] = "Mouse1",
-                    ["strong_attack"] = "Mouse3",
-                    ["lock_on"] = "Mouse2",
-                    ["firearm"] = "F",
-                    ["use_item"] = "V",
-                    ["transform"] = "C",
-                }, BuiltIn: true),
+            new("Controller", "Bloodborne PC", "", new Dictionary<string,string>(),
+                BuiltIn: true, Pad: new Dictionary<string,string>(), InputDevice: "controller"),
         };
         // ---------------------------------------------------------------- saved profiles
 
-        public static List<Profile> All()
+        public static List<Profile> All(string? inputDevice = null)
         {
             var list = new List<Profile>(BuiltIns);
             try
@@ -113,14 +103,18 @@ namespace BloodborneLauncher.Core
             {
                 // Unreadable folder: the built-ins only.
             }
-            return list;
+            return inputDevice == null ? list : list.Where(p => p.InputDevice == inputDevice).ToList();
         }
 
         /// <summary>Saves a profile under its name (replacing one of the same name); returns the file.</summary>
         public static string Save(Profile profile)
         {
             Directory.CreateDirectory(Folder);
-            var file = Path.Combine(Folder, SafeFileName(profile.Name) + ".json");
+            var file = Path.Combine(Folder, profile.InputDevice + "-" + SafeFileName(profile.Name) + ".json");
+            // Only a profile loaded from this folder may overwrite its original legacy filename.
+            if (!string.IsNullOrEmpty(profile.File) &&
+                string.Equals(Path.GetDirectoryName(Path.GetFullPath(profile.File)), Path.GetFullPath(Folder), StringComparison.OrdinalIgnoreCase))
+                file = profile.File;
             File.WriteAllText(file, ToJson(profile), new UTF8Encoding(false));
             return file;
         }
@@ -145,22 +139,23 @@ namespace BloodborneLauncher.Core
         /// <summary>Makes a profile's bindings the current ones (inputs it leaves out get the game's key).</summary>
         public static void Apply(LauncherSettings s, IniFile ini, Profile profile)
         {
-            foreach (var control in InputMap.Controls)
+            bool keyboard = profile.InputDevice == "keyboard_mouse";
+            if (keyboard)
             {
-                var value = profile.Bindings.TryGetValue(control.Name, out var v) ? v : control.Default;
-                Bindings.Set(ini, control, InputMap.Split(value));
+                foreach (var control in InputMap.Controls)
+                {
+                    var value = profile.Bindings.TryGetValue(control.Name, out var v) ? v : control.Default;
+                    Bindings.Set(ini, control, InputMap.Split(value));
+                }
             }
-            if (profile.Pad != null)
-                PadMap.Apply(ini, profile.Pad);
-            if (profile.BuiltIn && profile.Name == DarkSouls3Name)
-            {
-                ini.Set("input_mode","keyboard_mouse");
-                ini.Set("ds3_profile","1");
-                ini.Set("button_prompts","keyboard");
-                ini.Set("pc_controls", "1");
-                ini.Set("mouse_camera", "1");
-                ini.Set("mouse_menu", "1");
-            }
+            else PadMap.Apply(ini, profile.Pad);
+            ini.Set("input_mode", profile.InputDevice);
+            ini.Set("pc_controls", "1");
+            ini.Set("mouse_camera", keyboard ? "1" : "0");
+            ini.Set("mouse_menu", "1");
+            ini.Set("button_prompts", keyboard ? "keyboard" : "controller");
+            if (profile.BuiltIn && profile.Name == DarkSouls3Name) ini.Set("ds3_profile", "1");
+            s.Set("controls_profile." + profile.InputDevice, profile.Name);
             s.Set("controls_profile", profile.Name);
         }
 
@@ -169,12 +164,13 @@ namespace BloodborneLauncher.Core
         public static string ToJson(Profile profile)
         {
             var bindings = new JsonObject();
-            foreach (var control in InputMap.Controls)
+            foreach (var control in InputMap.Controls.Where(_ => profile.InputDevice == "keyboard_mouse"))
                 bindings[control.Name] = profile.Bindings.TryGetValue(control.Name, out var v) ? v : control.Default;
             var json = new JsonObject
             {
                 ["format"] = Format,
                 ["version"] = Version,
+                ["input_device"] = profile.InputDevice,
                 ["name"] = profile.Name,
                 ["author"] = profile.Author,
                 ["description"] = profile.Description,
@@ -213,6 +209,9 @@ namespace BloodborneLauncher.Core
             if (root["bindings"] is not JsonObject bindings)
                 throw new FormatException(BloodborneLauncher.Core.UiText.T("This file has no \"bindings\" section."));
 
+            var device = Str(root, "input_device") ?? "keyboard_mouse";
+            if (root.ContainsKey("input_device") && Str(root, "input_device") == null || device is not ("keyboard_mouse" or "controller"))
+                throw new FormatException(UiText.T("Unknown input device in the control profile."));
             var notes = new List<string>();
             var known = InputMap.Controls.ToDictionary(c => c.Name, StringComparer.OrdinalIgnoreCase);
             var result = new Dictionary<string, string>();
@@ -250,8 +249,6 @@ namespace BloodborneLauncher.Core
                 names = new[] { key, mouse }.Where(n => n != null).Select(n => n!).ToList();
                 result[control.Name] = InputMap.Join(names);
             }
-            if (result.Count == 0)
-                throw new FormatException(BloodborneLauncher.Core.UiText.T("This profile binds nothing the launcher knows."));
 
             // The controller layout: PS4 inputs and SDL button names the launcher offers.
             Dictionary<string, string>? padMap = null;
@@ -274,12 +271,14 @@ namespace BloodborneLauncher.Core
                 }
             }
 
+            if (device == "keyboard_mouse" && result.Count == 0 || device == "controller" && padMap == null)
+                throw new FormatException(UiText.T("This profile binds nothing the launcher knows."));
             var nameText = Clip(Str(root, "name") ?? "", 60).Trim();
             return new Parsed(new Profile(
                 nameText.Length > 0 ? nameText : "Imported profile",
                 Clip(Str(root, "author") ?? "", 60).Trim(),
                 Clip(Str(root, "description") ?? "", 400).Trim(),
-                result, Pad: padMap), notes);
+                result, Pad: padMap, InputDevice: device), notes, root.ContainsKey("input_device"));
         }
 
         private static string? Str(JsonObject root, string key) =>

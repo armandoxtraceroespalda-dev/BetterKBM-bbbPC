@@ -19,17 +19,10 @@ namespace BloodborneLauncher.Views
         private readonly ContentControl _frame = new() { Focusable=false,HorizontalContentAlignment=HorizontalAlignment.Stretch,VerticalContentAlignment=VerticalAlignment.Stretch };
         private readonly Segmented _tabs;
         private int _current = -1;
-        private System.Windows.Threading.DispatcherOperation? _shownRefresh;
-
         private void RefreshAfterNavigation(LauncherPage page)
         {
-            _shownRefresh?.Abort();
-            if (!IsVisible) return; // The parent calls OnShown after the first navigation.
-            _shownRefresh=Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,new Action(() =>
-            {
-                _shownRefresh=null;
-                if (IsVisible && ReferenceEquals(_frame.Content,page)) page.OnShown();
-            }));
+            // The parent performs this refresh before starting its entrance animation.
+            if (IsVisible && ReferenceEquals(_frame.Content, page)) page.OnShown();
         }
 
         public MorePage() : base(BloodborneLauncher.Core.UiText.T("More"), "")
@@ -52,7 +45,6 @@ namespace BloodborneLauncher.Views
             Content = BloodborneLauncher.Core.UiText.T(root);
             Open(0);
             ReleaseWhenDisposed(() => {
-                _shownRefresh?.Abort();
                 _pages.Clear();
                 _frame.Content=null;
             });

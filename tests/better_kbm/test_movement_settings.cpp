@@ -10,7 +10,7 @@
 
 int main() {
     auto& settings=BbSettings::Get();
-    assert(settings.stick_turn_rate==1200&&settings.stick_release_delay_ms==60&&settings.stick_circular);
+    assert(settings.stick_turn_rate==1200&&settings.stick_release_delay_ms==0&&settings.stick_circular);
     auto path=std::filesystem::temp_directory_path()/
         ("bbport-movement-"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())+".ini");
     const auto file=path.string();

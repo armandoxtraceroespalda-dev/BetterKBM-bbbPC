@@ -58,10 +58,21 @@ namespace BloodborneLauncher.Core
 
         public static readonly string[] MouseTokens = { "Mouse1", "Mouse2", "Mouse3", "Mouse4", "Mouse5", "WheelUp", "WheelDown" };
 
-        public static bool IsMouse(string name) => MouseTokens.Contains(name, StringComparer.OrdinalIgnoreCase);
+        private static readonly string[] CompactModifiers = { "Ctrl+", "Control+", "Shift+", "Alt+" };
+        private static (string Prefix,string Input) CompactParts(string value) {
+            string prefix="";
+            bool again=true;
+            while(again){again=false;foreach(var token in CompactModifiers)
+                if(value.StartsWith(token,StringComparison.OrdinalIgnoreCase)){
+                    prefix+=token.Equals("Control+",StringComparison.OrdinalIgnoreCase)?"Ctrl+":token;
+                    value=value[token.Length..].Trim();again=true;break;
+                }}
+            return (prefix,value);
+        }
+        public static bool IsMouse(string name) => MouseTokens.Contains(CompactParts(name).Input, StringComparer.OrdinalIgnoreCase);
 
         /// <summary>A friendly name for a chip.</summary>
-        public static string Display(string name) => BindingExpressions.IsChord(name)?string.Join(" + ",BindingExpressions.Atoms(name).Select(Display)):DisplaySingle(name);
+        public static string Display(string name) => CompactParts(name).Prefix.Length > 0 ? CompactParts(name).Prefix.Replace("+", " + ")+DisplaySingle(CompactParts(name).Input) : BindingExpressions.IsChord(name)?string.Join(" + ",BindingExpressions.Atoms(name).Select(Display)):DisplaySingle(name);
         // Translate only known input names. Letters and saved SDL tokens remain literal data.
         private static readonly Dictionary<string, string> KeyDisplayNames = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -194,7 +205,11 @@ namespace BloodborneLauncher.Core
         });
 
         /// <summary>A key or mouse name in the engine's spelling, or null if it is not one.</summary>
-        public static string? Canonical(string name)=>BindingExpressions.IsChord(name)?BindingExpressions.Normalize(name,CanonicalSingle):CanonicalSingle(name);
+        public static string? Canonical(string name){
+            var compact=CompactParts(name);
+            if(compact.Prefix.Length>0){var input=CanonicalSingle(compact.Input);return input==null?null:compact.Prefix+input;}
+            return BindingExpressions.IsChord(name)?BindingExpressions.Normalize(name,CanonicalSingle):CanonicalSingle(name);
+        }
         public static string? CanonicalSingle(string name)
         {
             if(name=="Comma"||name=="Keypad Comma"||name=="Keypad Plus")return name;
@@ -217,14 +232,11 @@ namespace BloodborneLauncher.Core
         private static bool Same(List<string> a, List<string> b) =>
             a.Count == b.Count && a.Zip(b).All(p => p.First.Equals(p.Second, StringComparison.OrdinalIgnoreCase));
 
-        /// <summary>One key and one mouse input at most, key first; written out explicitly ("none" unbinds).</summary>
+        /// <summary>Up to five alternative inputs; none unbinds the action.</summary>
         public static void Set(IniFile ini, ControlDef c, IEnumerable<string> names)
         {
-            var list = names.ToList();
-            if(list.LastOrDefault(BindingExpressions.IsChord) is {} chord){ini.Set(IniKey(c),chord);return;}
-            var key = list.LastOrDefault(n => !InputMap.IsMouse(n));
-            var mouse = list.LastOrDefault(InputMap.IsMouse);
-            var value = InputMap.Join(new[] { key, mouse }.Where(n => n != null)!);
+            var list = names.Distinct(StringComparer.OrdinalIgnoreCase).Take(5).ToList();
+            var value = InputMap.Join(list);
             ini.Set(IniKey(c), value.Length == 0 ? "none" : value);
         }
 

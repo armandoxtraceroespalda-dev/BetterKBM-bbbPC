@@ -14,7 +14,7 @@ namespace BloodborneLauncher.Views
     public sealed class OnlinePage : LauncherPage
     {
         private readonly ToggleSwitch _online;
-        private readonly StackPanel _results = new();
+        private readonly StackPanel _results = new OptionRows();
         private readonly Button _test;
 
         /// <summary>Where shadNet accounts are made (the public server's).</summary>
@@ -49,7 +49,7 @@ namespace BloodborneLauncher.Views
             Add(Card(SymbolRegular.PersonAccounts24, BloodborneLauncher.Core.UiText.T("Hunter's Dream account"), null, _hdButton, out _hdHint));
             ShowLink();
 
-            Group(BloodborneLauncher.Core.UiText.T("shadNet account (sign-in and summons)"));
+            Group(BloodborneLauncher.Core.UiText.T("shadNet account"));
             Body.Children.Add(Text(BloodborneLauncher.Core.UiText.Format("Enter the account name you registered (up to 16 characters), not an email address. The password is kept encrypted for your Windows user, not in bbport.ini."), "Faint"));
             Add(Card(SymbolRegular.PersonAdd24, BloodborneLauncher.Core.UiText.T("No account yet?"), BloodborneLauncher.Core.UiText.T("Register one, then enter it below"),
                 SmallButton(BloodborneLauncher.Core.UiText.T("Create account"), SymbolRegular.Open24, (_, _) =>
@@ -69,7 +69,7 @@ namespace BloodborneLauncher.Views
             };
             Add(Card(SymbolRegular.Password24, BloodborneLauncher.Core.UiText.T("Password"), null, password, out _));
 
-            Group(BloodborneLauncher.Core.UiText.T("Connection"));
+            SettingsColumns.SetTwoColumns(Group(UiText.T("Connection")), true);
             ToggleRow(SymbolRegular.Router24, BloodborneLauncher.Core.UiText.T("UPnP"), BloodborneLauncher.Core.UiText.T("Open the port on the router automatically; turn off with a VPN"),
                 () => Ini.Get("online_upnp", "1") == "1", v => Ini.Set("online_upnp", v ? "1" : "0"));
             IniText(SymbolRegular.Router24, "Local P2P port", "Empty: 3658, the PS4's (UPnP opens it on the router)", "3658", "online_p2p_port", 120);

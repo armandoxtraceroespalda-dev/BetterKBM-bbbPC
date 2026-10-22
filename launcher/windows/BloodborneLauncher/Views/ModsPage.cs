@@ -142,7 +142,7 @@ namespace BloodborneLauncher.Views
                     }
                 };
                 var hint = patch.File + (patch.Author.Length > 0 ? $" · by {patch.Author}" : "");
-                var card = Card(SymbolRegular.DocumentText24, BloodborneLauncher.Core.UiText.T(patch.Name), BloodborneLauncher.Core.UiText.T(hint), toggle, out _);
+                var card = Card(SymbolRegular.DocumentText24, PatchTitles.Display(patch.Name, UiText.T), BloodborneLauncher.Core.UiText.T(hint), toggle, out _);
                 card.Margin = new Thickness(24, 0, 0, 4);
                 if (patch.Note.Length > 0)
                     card.ToolTip = BloodborneLauncher.Core.UiText.T(patch.Note);

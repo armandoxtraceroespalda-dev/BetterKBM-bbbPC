@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 using BloodborneLauncher.Core;
 using Button=System.Windows.Controls.Button;
 namespace BloodborneLauncher.Views;
@@ -11,6 +12,8 @@ public sealed class MenuHomePage : LauncherPage
     private readonly Button _play;
     private readonly List<TextBlock> _statLabels = new(), _statValues = new();
     private readonly MenuSurface _overview, _versionSurface;
+    private readonly TextBlock _sessionText;
+    private readonly DispatcherTimer _sessionClock = new() { Interval = TimeSpan.FromSeconds(1) };
     private double _infoScale = double.NaN;
     private readonly TextBlock _upscaler,_resolution,_fps,_achievements,_gameVersion;
     public MenuHomePage():base(BloodborneLauncher.Core.UiText.T("Start"),"",settingsShell:false)
@@ -26,7 +29,14 @@ public sealed class MenuHomePage : LauncherPage
         stats.Children.Add(Stat("Upscaler",out _upscaler));stats.Children.Add(Stat("Output",out _resolution));
         stats.Children.Add(Stat("Frame rate",out _fps));stats.Children.Add(Stat("Achievements",out _achievements));
         var statsScale=new Viewbox { Stretch=Stretch.Uniform,StretchDirection=StretchDirection.DownOnly,Child=stats };
-        _overview=new MenuSurface { ShadowOpacity=0.42,Padding=new Thickness(12,12,12,12),Margin=new Thickness(0,12,0,0),HorizontalAlignment=HorizontalAlignment.Right,Child=statsScale };
+        _sessionText = Text("", "Faint");
+        _sessionText.TextAlignment = TextAlignment.Center;
+        _sessionText.HorizontalAlignment = HorizontalAlignment.Center;
+        _sessionText.TextWrapping = TextWrapping.Wrap;
+        _sessionText.Margin = new Thickness(8, 10, 8, 0);
+        var overviewContent = new StackPanel();
+        overviewContent.Children.Add(statsScale); overviewContent.Children.Add(_sessionText);
+        _overview=new MenuSurface { ShadowOpacity=0.42,Padding=new Thickness(12,12,12,12),Margin=new Thickness(0,12,0,0),HorizontalAlignment=HorizontalAlignment.Right,Child=overviewContent };
         Grid.SetColumnSpan(_overview,2);grid.Children.Add(_overview);
         var version=Stat("Game version",out _gameVersion);
         _versionSurface=new MenuSurface { ShadowOpacity=0.42,Padding=new Thickness(16,28,16,28),Width=260,
@@ -41,7 +51,11 @@ public sealed class MenuHomePage : LauncherPage
         var scale=new Viewbox { Stretch=Stretch.Uniform,StretchDirection=StretchDirection.Both,Child=_play,HorizontalAlignment=HorizontalAlignment.Right,Margin=new Thickness(0,0,12,20) };
         Grid.SetRow(scale,1);actionArea.Children.Add(scale);grid.Children.Add(actionArea);Content=BloodborneLauncher.Core.UiText.T(grid);
         SizeChanged += (_,_) => ScaleInformation();
-        Loaded += (_,_) => ScaleInformation();
+        Loaded += (_,_) => { ScaleInformation(); UpdateSessionStatus(); };
+        _sessionClock.Tick += (_,_) => UpdateSessionStatus();
+        Unloaded += (_,_) => _sessionClock.Stop();
+        Ws.GameStateChanged += Refresh;
+        ReleaseWhenDisposed(() => { Ws.GameStateChanged -= Refresh; _sessionClock.Stop(); });
         Ws.Saved+=Refresh;Ws.PortChanged+=Refresh;Ws.TrophiesChanged+=Refresh;
         ReleaseWhenDisposed(()=>{Ws.Saved-=Refresh;Ws.PortChanged-=Refresh;Ws.TrophiesChanged-=Refresh;});
     }
@@ -59,10 +73,12 @@ public sealed class MenuHomePage : LauncherPage
         double scale = TabMetrics.SidebarScale(window?.ActualWidth ?? 1280, window?.ActualHeight ?? 800);
         if (Math.Abs(scale - _infoScale) < 0.005) return;
         _infoScale = scale;
-        foreach (var label in _statLabels) label.FontSize = 13 * scale;
-        foreach (var value in _statValues) value.FontSize = 19 * scale;
+        foreach (var label in _statLabels) label.FontSize = 11.375 * scale;
+        foreach (var value in _statValues) value.FontSize = 16.625 * scale;
         _versionSurface.Width = 260 * scale;
         _versionSurface.Padding = new Thickness(16 * scale, 28 * scale, 16 * scale, 28 * scale);
+        _sessionText.FontSize = 12.25 * scale;
+        _sessionText.MaxWidth = 600 * scale;
         _overview.Padding = new Thickness(12 * scale);
         _overview.Margin = new Thickness(0, 12 * scale, 0, 0);
     }
@@ -76,6 +92,23 @@ public sealed class MenuHomePage : LauncherPage
         var status=GameCheck.Inspect(GameEnvironment.GameDir(S));
         _gameVersion.Text=status.Health==Health.Bad?BloodborneLauncher.Core.UiText.T("Not found"):BloodborneLauncher.Core.UiText.T($"{status.TitleId} {status.Version}".Trim());
         SetRunning(Ws.Game.Running);
+        UpdateSessionStatus();
+    }
+    public void UpdateSessionStatus()
+    {
+        if (Ws.Game.Running)
+        {
+            var up = DateTime.Now - Ws.Game.StartedAt;
+            _sessionText.Text = UiText.Format("Running for {0}", $"{(int)up.TotalMinutes}:{up.Seconds:00}");
+            if (IsLoaded && IsVisible) _sessionClock.Start(); else _sessionClock.Stop();
+        }
+        else
+        {
+            _sessionClock.Stop();
+            _sessionText.Text = Ws.Session is { Length.TotalSeconds: > 10 } last
+                ? UiText.Format("Last session: {0}", last.Summary) : "";
+        }
+        _sessionText.Visibility = string.IsNullOrEmpty(_sessionText.Text) ? Visibility.Collapsed : Visibility.Visible;
     }
     public void SetRunning(bool running)=>_play.Content=running?BloodborneLauncher.Core.UiText.T("Stop"):BloodborneLauncher.Core.UiText.T("Play");
     public override void OnShown()=>Refresh();

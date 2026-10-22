@@ -8,32 +8,44 @@ using TextBlock = System.Windows.Controls.TextBlock;
 namespace BloodborneLauncher.Views
 {
     /// <summary>GPU, screen, upscaling and the game's own rendering effects.</summary>
-    public sealed class GraphicsPage : LauncherPage
+    public sealed partial class GraphicsPage : LauncherPage
     {
-        private readonly TextBlock _upscalerHint, _dlssHint, _hardwareHint;
-        private readonly SettingRow _presetCard, _sharpenCard, _sharpnessCard;
+        private readonly TextBlock _upscalerHint, _dlssHint, _frameGenHint;
+        private TextBlock? _motionBlurHint;
+        private readonly SettingRow _presetCard, _renderScaleCard, _sharpenCard, _sharpnessCard, _mipBiasCard;
+        private readonly SettingRow _frameGenFramesCard, _frameGenDynamicCard, _reflexCard, _frameGenCapCard;
 
         private readonly ComboBox _gpuSelector;
+        private readonly OptionRows _pictureOptions = new();
+        private void UpdatePictureOptions()
+        {
+            _pictureOptions.IsEnabled = Ini.Flag("graphics_controls");
+            _pictureOptions.Opacity = _pictureOptions.IsEnabled ? 1 : 0.45;
+        }
         public GraphicsPage() : base(BloodborneLauncher.Core.UiText.T("Graphics"),
             BloodborneLauncher.Core.UiText.T("Stored in bbport.ini; the upscaler can also be changed in game (Insert or L3 + R3)."))
         {
-            var recommend = SmallButton(BloodborneLauncher.Core.UiText.T("Recommended"), SymbolRegular.Sparkle24,
+            var recommend = SmallButton(BloodborneLauncher.Core.UiText.T("Recommended settings"), SymbolRegular.Sparkle24,
                 (_, _) => MainWindow.Instance!.OfferBestSettings(firstRun: false));
-            recommend.MinWidth = 230;
-            recommend.Padding = new Thickness(14, 6, 14, 6);
-            Add(Card(SymbolRegular.Gauge24, BloodborneLauncher.Core.UiText.T("Best settings for this PC"), "", recommend, out _hardwareHint));
-            recommend.Margin = new Thickness(16, 0, 12, 0);
-            _hardwareHint.MaxWidth = 560;
-            UpdateHardwareHint();
+            recommend.Content = UiText.T("Recommended settings");
+            recommend.Icon = null;
+            recommend.Tag = "standalone";
+            recommend.MinWidth = 220;
+            recommend.HorizontalAlignment = HorizontalAlignment.Right;
+            recommend.Margin = new Thickness(0, 0, 12, 8);
+            Body.Children.Add(recommend);
+            SettingsColumns.SetFullWidth(recommend, true);
 
             var adapters=new[]{new Choice(PcText.Get("Automatic"),"-1")}.Concat(GpuAdapters.All().Select(g=>Choice.Literal(g.Label,g.Index.ToString()))).ToArray();
             _gpuSelector=(ComboBox)ComboRow(SymbolRegular.DeveloperBoard24,BloodborneLauncher.Core.UiText.T(PcText.Get("Rendering GPU")),BloodborneLauncher.Core.UiText.T(PcText.Get("Select the graphics card used by Vulkan")),adapters,
                 ()=>GpuAdapters.SelectedIndex(Ini).ToString(),v=>{
                     Ini.Set("gpu_id",v);Ini.Set("gpu_name",GpuAdapters.All().FirstOrDefault(g=>g.Index.ToString()==v)?.Name??"");
                     Hardware.Reset();
-                    UpdateHardwareHint();
+
                 },width:560);
             var gpuRow=(SettingRow)Body.Children[^1];
+            gpuRow.StyleNameAsHeading();
+            SettingsColumns.SetFullWidth(gpuRow, true);
             // The right edge stays aligned; a wider selector grows left into the row.
             // Reserve label space at smaller window sizes rather than overflowing the card.
             gpuRow.SizeChanged+=(_,_)=>_gpuSelector.MaxWidth=Math.Max(120,gpuRow.ActualWidth-gpuRow.Padding.Left-gpuRow.Padding.Right-180);
@@ -41,7 +53,8 @@ namespace BloodborneLauncher.Views
             _gpuSelector.SelectionChanged+=(_,_)=>UpdateGpuTip();
             UpdateGpuTip();
 
-            Group(BloodborneLauncher.Core.UiText.T("Screen"));
+            SettingsColumns.SetTwoColumns(Group(UiText.T("Screen")), true);
+            BuildMonitorSetting();
             SettingCombo(SymbolRegular.Gauge24, BloodborneLauncher.Core.UiText.T("Frame rate"), BloodborneLauncher.Core.UiText.T("30, 60, 90, 120 and 144 are the game's frame-rate patches for that rate; Uncapped uses the community uncapped patch"), Choices.FpsModes, "fps_mode");
             OutputResolutionRow();
             IniCombo(SymbolRegular.ArrowSync24, BloodborneLauncher.Core.UiText.T("Live resolution change"),
@@ -51,6 +64,31 @@ namespace BloodborneLauncher.Views
                 () => Ini.Get("widescreen", "1") != "0", v => Ini.Set("widescreen", v ? "1" : "0"));
             SettingCombo(SymbolRegular.Image24, BloodborneLauncher.Core.UiText.T("Vsync"), BloodborneLauncher.Core.UiText.T(PcText.Get("Synchronizes frames with the display to prevent image tearing. The selected mode affects latency and how late frames are displayed.")), Choices.PresentModes, "present_mode");
 
+
+            Group(BloodborneLauncher.Core.UiText.T("Game effects"));
+            Body.Children.Add(Text(BloodborneLauncher.Core.UiText.T("Patches to the game, applied when it starts."), "Faint"));
+            IniCombo(SymbolRegular.Cube24, BloodborneLauncher.Core.UiText.T("Model detail"), null, Choices.ModelLod, "model_lod");
+            IniToggle(SymbolRegular.CircleHalfFill24, BloodborneLauncher.Core.UiText.T("Vignette"), null, "graphics_vignette");
+            foreach (var effect in Choices.Effects.Where(effect => effect.Key is not ("skip_intro" or "debug_camera"))) {
+                IniToggle(EffectIcon(effect.Key), UiText.T(effect.Title), UiText.T(effect.Hint), effect.Key,
+                    changed: effect.Key == "effect_motion_blur" ? UpdateUpscaler : null);
+                if (effect.Key == "effect_motion_blur") _motionBlurHint = ((SettingRow)Body.Children[^1]).Hint;
+            }
+
+            // The engine's picture and camera controls (bbport_settings.cpp clamps the same ranges).
+            Group(BloodborneLauncher.Core.UiText.T("Picture"));
+            var picture = _pictureOptions;
+            IniToggle(SymbolRegular.Color24, BloodborneLauncher.Core.UiText.T("Picture tuning"), BloodborneLauncher.Core.UiText.T("Turns the settings below on, live. Also in the game's System menu (PC Graphics, PC Effects, PC Colour) and the Insert menu"), "graphics_controls", changed: UpdatePictureOptions);
+            IniSlider(SymbolRegular.DarkTheme24, BloodborneLauncher.Core.UiText.T("Ambient occlusion strength"), 0, 3, "graphics_ao_strength", picture);
+            IniSlider(SymbolRegular.WeatherSunny24, BloodborneLauncher.Core.UiText.T("Shadow distance"), 0.5, 4, "graphics_shadow_scale", picture);
+            IniSlider(SymbolRegular.Lightbulb24, BloodborneLauncher.Core.UiText.T("Bloom"), 0, 3, "graphics_bloom", picture);
+            IniSlider(SymbolRegular.Color24, BloodborneLauncher.Core.UiText.T("Saturation"), 0, 3, "graphics_saturation", picture);
+            IniSlider(SymbolRegular.BrightnessHigh24, BloodborneLauncher.Core.UiText.T("Brightness"), 0, 3, "graphics_brightness", picture);
+            IniSlider(SymbolRegular.DarkTheme24, BloodborneLauncher.Core.UiText.T("Contrast"), 0.8, 1.2, "graphics_contrast", picture, step: 0.01);
+            IniSlider(SymbolRegular.Color24, BloodborneLauncher.Core.UiText.T("Hue"), -180, 180, "graphics_hue", picture, step: 1, fallback: 0);
+            IniSlider(SymbolRegular.WeatherFog24, BloodborneLauncher.Core.UiText.T("Fog"), 0, 3, "graphics_fog", picture);
+            Body.Children.Add(picture);
+            UpdatePictureOptions();
 
             Group(BloodborneLauncher.Core.UiText.T("Upscaler"));
             // FSR 4.1.1 runs through fsr4vk (in the package) or an fsr4_411 set built from the player's
@@ -65,53 +103,61 @@ namespace BloodborneLauncher.Views
             IniCombo(SymbolRegular.ZoomIn24, BloodborneLauncher.Core.UiText.T("Quality preset"), BloodborneLauncher.Core.UiText.T("How far below the output resolution the game renders"),
                 Choices.Presets, "preset", changed: UpdateUpscaler);
             _presetCard = (SettingRow)Body.Children[^1];
+            // The Custom preset's ratio (render_scale), the engine's PresetScale: 1.0 renders at the
+            // output (DLAA with DLSS), 3.0 is Ultra Performance.
+            SliderRow(SymbolRegular.SlideSize24, UiText.T("Render scale (Custom preset)"),
+                UiText.T("Output size divided by this is the render size: 1.00 renders at the output, 1.30 a little below, 3.00 like Ultra Performance. FSR 4 and DLSS use the nearest preset's model"),
+                1.0, 3.0, 0.05, () => ParseDouble(Ini.Get("render_scale", "1.30"), 1.3), v => Ini.Set("render_scale", Fmt(v)), format: "x0.00", valueWidth: 56);
+            _renderScaleCard = (SettingRow)Body.Children[^1];
+
+
 
             IniToggle(SymbolRegular.Eyedropper24, BloodborneLauncher.Core.UiText.T("Sharpening (RCAS)"), BloodborneLauncher.Core.UiText.T("Works with every option above, TAA included: turn it up if the picture looks soft"), "sharpen");
             _sharpenCard = (SettingRow)Body.Children[^1];
             SliderRow(SymbolRegular.SlideSize24, BloodborneLauncher.Core.UiText.T("Sharpening strength"), BloodborneLauncher.Core.UiText.T("Up to 1: the upscaler's own sharpening. Above 1: an extra pass"), 0, 2, 0.05,
                 () => ParseDouble(Ini.Get("sharpness"), 0.5), v => Ini.Set("sharpness", Fmt(v)));
             _sharpnessCard = (SettingRow)Body.Children[^1];
+            SliderRow(SymbolRegular.Image24, UiText.T("Texture mip bias"),
+                UiText.T("Added to the texture detail the upscaler asks for: below 0 sharper textures (more shimmer), above 0 softer. 0 is the upscaler's own"),
+                -2, 1, 0.05, () => ParseDouble(Ini.Get("mip_bias", "0"), 0), v => Ini.Set("mip_bias", Fmt(v)), format: "+0.00;-0.00;0.00", valueWidth: 56);
+            _mipBiasCard = (SettingRow)Body.Children[^1];
+            IniToggle(SymbolRegular.ArrowMove24, UiText.T("Object motion vectors"), UiText.T("Less ghosting on characters; costs about 10% FPS"), "object_motion");
 
-            IniToggle(SymbolRegular.ArrowMove24, BloodborneLauncher.Core.UiText.T("Object motion vectors"), BloodborneLauncher.Core.UiText.T("Less ghosting on characters; costs about 10% FPS"), "object_motion");
-            Add(Card(SymbolRegular.DeveloperBoard24, BloodborneLauncher.Core.UiText.T("DLSS"), "", null, out _dlssHint));
+            var dlssMore = new OptionRows();
+            Group(UiText.T("DLSS options"), dlssMore);
+            Body.Children.Add(dlssMore);
+            IniCombo(SymbolRegular.Sparkle24, UiText.T("DLSS model"),
+                UiText.T("Which NVIDIA model DLSS runs. Also in game (Insert or L3 + R3), where it changes at once"), Choices.DlssModels, "dlss_preset", dlssMore);
+            ToggleRow(SymbolRegular.BrightnessHigh24, UiText.T("DLSS auto exposure"),
+                UiText.T("DLSS works out each frame's exposure itself, for the game's finished frame too. Can calm ghosting in dark scenes"),
+                () => Ini.Get("dlss_auto_exposure", "0") == "1", v => Ini.Set("dlss_auto_exposure", v ? "1" : "0"), dlssMore);
+            ToggleRow(SymbolRegular.Image24, UiText.T("DLSS sharper textures"),
+                UiText.T("One more mip level of texture detail under DLSS, as NVIDIA's guide asks. Off: the render-to-output ratio only"),
+                () => Ini.Get("dlss_mip_bias", "1") != "0", v => Ini.Set("dlss_mip_bias", v ? "1" : "0"), dlssMore);
+            Add(Card(SymbolRegular.DeveloperBoard24, "DLSS", "", null, out _dlssHint), dlssMore);
 
-            IniCombo(SymbolRegular.Sparkle24,"Frame generation","Generate additional frames using a supported device",Choices.FrameGeneration,"frame_gen");
-            IniToggle(SymbolRegular.Gauge24,"Cap generated frames","Limit generated frames to the selected output rate","frame_gen_cap");
-            IniCombo(SymbolRegular.Image24,"DLSS model","Model preference used on the next game launch",Choices.DlssModels,"dlss_preset");
-            IniCombo(SymbolRegular.Sparkle24,"Generated frames","RTX 40 supports 2x; additional generated frames require RTX 50",Choices.FrameGenFrames,"frame_gen_frames");
-            IniCombo(SymbolRegular.Timer24,"NVIDIA Reflex","Low latency for DLSS frame generation",Choices.Reflex,"reflex");
-            SliderRow(SymbolRegular.ZoomIn24,"Custom render scale","Used with the Custom quality preset: output size divided by this scale",1,3,0.05,
-                ()=>ParseDouble(Ini.Get("render_scale"),1.3),v=>Ini.Set("render_scale",Fmt(v)));
-            SliderRow(SymbolRegular.Image24,"Texture LOD bias","Texture detail bias used by the upscaler",-2,1,0.05,
-                ()=>ParseDouble(Ini.Get("mip_bias"),0),v=>Ini.Set("mip_bias",Fmt(v)));
-            Group(BloodborneLauncher.Core.UiText.T("Game effects"));
-            Body.Children.Add(Text(BloodborneLauncher.Core.UiText.T("Patches to the game, applied when it starts."), "Faint"));
-            IniCombo(SymbolRegular.Cube24, BloodborneLauncher.Core.UiText.T("Model detail"), null, Choices.ModelLod, "model_lod");
-            foreach (var effect in Choices.Effects.Where(effect => effect.Key is not ("skip_intro" or "debug_camera")))
-                IniToggle(EffectIcon(effect.Key), BloodborneLauncher.Core.UiText.T(effect.Title), BloodborneLauncher.Core.UiText.T(effect.Hint), effect.Key);
+            IniCombo(SymbolRegular.FastForward24, UiText.T("Frame generation"),
+                UiText.T("Extra frames between the game's own: smoother motion, a little more input lag. Needs an upscaler. Off by default"),
+                Choices.FrameGeneration, "frame_gen", changed: UpdateUpscaler);
+            _frameGenHint = (TextBlock)((SettingRow)Body.Children[^1]).Tag;
+            IniCombo(SymbolRegular.FastForward24, UiText.T("DLSS generated frames"),
+                UiText.T("Frames shown per frame the game renders. More than 2x needs an RTX 50 GPU; the engine keeps to what the GPU allows"),
+                Choices.FrameGenFrames, "frame_gen_frames");
+            _frameGenFramesCard = (SettingRow)Body.Children[^1];
+            IniToggle(SymbolRegular.TopSpeed24, UiText.T("DLSS dynamic frame generation"),
+                UiText.T("RTX 50: the driver picks 2x, 3x or 4x moment by moment to reach your refresh rate, up to the generated frames above. Fewer generated frames when the game is fast: less lag, fewer artifacts. Also in game, with a target FPS"), "frame_gen_dynamic");
+            _frameGenDynamicCard = (SettingRow)Body.Children[^1];
+            IniCombo(SymbolRegular.Flash24, UiText.T("NVIDIA Reflex"),
+                UiText.T("Keeps the GPU's queue short for lower input lag. Always on while DLSS Frame Generation runs"),
+                Choices.Reflex, "reflex");
+            _reflexCard = (SettingRow)Body.Children[^1];
+            IniToggle(SymbolRegular.Timer24, UiText.T("Frame generation: even pacing (Uncapped)"),
+                UiText.T("With the Uncapped frame rate: the game at the refresh rate divided by the frames shown per game frame, so every generated frame reaches the screen. The fixed rates (30 to 144) are left as they are"), "frame_gen_cap");
+            _frameGenCapCard = (SettingRow)Body.Children[^1];
 
-            // The engine's picture and camera controls (bbport_settings.cpp clamps the same ranges).
-            Group(BloodborneLauncher.Core.UiText.T("Picture"));
-            var picture = new StackPanel();
-            IniToggle(SymbolRegular.Color24, BloodborneLauncher.Core.UiText.T("Picture tuning"), BloodborneLauncher.Core.UiText.T("Turns the settings below on, live. Also in the game's System menu (PC Graphics, PC Effects, PC Colour) and the Insert menu"), "graphics_controls");
-            IniToggle(SymbolRegular.CircleHalfFill24, BloodborneLauncher.Core.UiText.T("Vignette"), null, "graphics_vignette", picture);
-            IniSlider(SymbolRegular.DarkTheme24, BloodborneLauncher.Core.UiText.T("Ambient occlusion strength"), 0, 3, "graphics_ao_strength", picture);
-            IniSlider(SymbolRegular.WeatherSunny24, BloodborneLauncher.Core.UiText.T("Shadow distance"), 0.5, 4, "graphics_shadow_scale", picture);
-            IniSlider(SymbolRegular.Lightbulb24, BloodborneLauncher.Core.UiText.T("Bloom"), 0, 3, "graphics_bloom", picture);
-            IniSlider(SymbolRegular.Color24, BloodborneLauncher.Core.UiText.T("Saturation"), 0, 3, "graphics_saturation", picture);
-            IniSlider(SymbolRegular.BrightnessHigh24, BloodborneLauncher.Core.UiText.T("Brightness"), 0, 3, "graphics_brightness", picture);
-            IniSlider(SymbolRegular.DarkTheme24, BloodborneLauncher.Core.UiText.T("Contrast"), 0.8, 1.2, "graphics_contrast", picture, step: 0.01);
-            IniSlider(SymbolRegular.Color24, BloodborneLauncher.Core.UiText.T("Hue"), -180, 180, "graphics_hue", picture, step: 1, fallback: 0);
-            IniSlider(SymbolRegular.WeatherFog24, BloodborneLauncher.Core.UiText.T("Fog"), 0, 3, "graphics_fog", picture);
-            Body.Children.Add(picture);
+            BuildHdrSettings();
+            BuildInfoSettings();
 
-            Group(BloodborneLauncher.Core.UiText.T("Camera"));
-            IniToggle(SymbolRegular.Camera24, BloodborneLauncher.Core.UiText.T("Camera tuning"), BloodborneLauncher.Core.UiText.T("Turns the three settings below on"), "camera_controls");
-            IniSlider(SymbolRegular.ZoomOut24, BloodborneLauncher.Core.UiText.T("Field of view"), 1, 1.5, "camera_fov_scale");
-            IniSlider(SymbolRegular.ArrowMaximize24, BloodborneLauncher.Core.UiText.T("Distance"), 0.5, 1.5, "camera_distance_scale");
-            IniSlider(SymbolRegular.ArrowBidirectionalUpDown24, BloodborneLauncher.Core.UiText.T("Height"), 0.5, 1.5, "camera_height_scale");
-
-            // Engine features from 0.9.4, each with a switch, as IFreemz's "Bloodborne - Experimental".
             Group(BloodborneLauncher.Core.UiText.T("Experimental"));
             SettingToggle(SymbolRegular.Broom24, BloodborneLauncher.Core.UiText.T("VRAM cleanup"),
                 BloodborneLauncher.Core.UiText.T("Frees video memory held by textures the GPU drew, so long sessions don't fill up VRAM and slow down. Recommended: on"),
@@ -182,19 +228,24 @@ namespace BloodborneLauncher.Views
             _ => SymbolRegular.Color24,
         };
 
-        private void UpdateHardwareHint() => SetHint(_hardwareHint, BloodborneLauncher.Core.UiText.T(Hardware.Detect().Summary.Replace(" · ", "\n")));
         private void RefreshGraphics()
         {
             var value=GpuAdapters.SelectedIndex(Ini).ToString();
             var selected=_gpuSelector.Items.OfType<ComboBoxItem>().FirstOrDefault(item=>(string?)item.Tag==value);
             if(selected!=null && !ReferenceEquals(_gpuSelector.SelectedItem,selected))_gpuSelector.SelectedItem=selected;
-            UpdateHardwareHint();
             UpdateUpscaler();
         }
-        public override void OnShown() => RefreshGraphics();
+        public override void OnShown() { RefreshGraphics(); RefreshMonitors(); UpdateCounterOptions(); UpdateHdrOptions(); UpdatePictureOptions(); }
 
+        private bool DlssFrameGenGpu() {
+            var selected=GpuAdapters.All().FirstOrDefault(g=>g.Index==GpuAdapters.SelectedIndex(Ini));
+            string name=selected?.Name ?? Hardware.Detect().Gpu;
+            return System.Text.RegularExpressions.Regex.IsMatch(name, @"RTX\s*(PRO\s*)?[45]0\d\d", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        }
+        private static bool StreamlineFound() => File.Exists(Path.Combine(Paths.BinariesDir,"sl.interposer.dll")) &&
+            File.Exists(Path.Combine(Paths.BinariesDir,"sl.dlss_g.dll"));
         private static bool DlssFound() =>
-            File.Exists(Path.Combine(Paths.BinariesDir, "nvngx_dlss.dll")); // the engine has DLSS built in; NVIDIA's runtime sits beside it
+            Paths.DlssRuntime != null; // the engine has DLSS built in; NVIDIA's runtime sits beside it
 
         private void UpdateUpscaler()
         {
@@ -220,11 +271,37 @@ namespace BloodborneLauncher.Views
             _presetCard.IsEnabled = value is not ("taa" or "off");
             _sharpenCard.IsEnabled = value != "off";
             _sharpnessCard.IsEnabled = value != "off";
+            _mipBiasCard.IsEnabled = value != "off";
 
-            var ngx = Path.Combine(Paths.BinariesDir, "nvngx_dlss.dll");
-            SetHint(_dlssHint, DlssFound()
-                ? $"NVIDIA DLSS {System.Diagnostics.FileVersionInfo.GetVersionInfo(ngx).FileVersion} is included (out\\nvngx_dlss.dll). Choose it as the upscaler above"
-                : "out\\nvngx_dlss.dll is missing from the engine folder");
+            // Frame generation: DLSS's own rows only with DLSS chosen.
+            var frameGen = Ini.Get("frame_gen", "off");
+            _frameGenFramesCard.IsEnabled = frameGen == "dlss";
+            _frameGenDynamicCard.IsEnabled = frameGen == "dlss";
+            _reflexCard.IsEnabled = frameGen == "dlss";
+            _frameGenCapCard.IsEnabled = frameGen != "off";
+            SetHint(_frameGenHint, frameGen switch
+            {
+                "dlss" when !StreamlineFound() => UiText.T("NVIDIA Streamline (sl.interposer.dll, sl.dlss_g.dll) is missing from the engine folder: the game uses no frame generation"),
+                "dlss" when !DlssFrameGenGpu() => UiText.T("Needs an NVIDIA RTX 40 or 50 GPU with Hardware-accelerated GPU scheduling on; other GPUs: choose FSR 3.1"),
+                "dlss" => UiText.T("RTX 40: 2x; RTX 50: up to 6x. Loaded when the game starts; in game you can switch it off and on (Insert or L3 + R3)"),
+                "fsr3" => UiText.T("Any GPU. Not in menus, movies or with HDR output"),
+                _ => null,
+            });
+            if (frameGen != "off" && value == "off")
+                SetHint(_frameGenHint, UiText.T("Frame generation needs an upscaler (or TAA): choose one above"));
+
+            // An upscaler takes the finished frame at outputs other than 1920x1080 and can smear the
+            // game's motion blur; More > Engine can leave the blur out there (BB_UPSCALER_NO_BLUR).
+            var (w, h) = Choices.OutputSize(Ini.Get("output_res", "1920x1080"));
+            if (_motionBlurHint != null)
+                SetHint(_motionBlurHint, value != "off" && (w, h) != (1920, 1080) && Ini.Flag("effect_motion_blur")
+                    ? UiText.T("With an upscaler at an output other than 1920x1080 the blur can smear. More > Engine > No motion blur smear with upscalers leaves it out there")
+                    : null);
+
+            var ngx = Paths.DlssRuntime;
+            SetHint(_dlssHint, ngx != null
+                ? UiText.F($"NVIDIA DLSS {Paths.DlssVersion(ngx)} is included ({Path.Combine("out", Path.GetFileName(ngx))}). Choose it as the upscaler above")
+                : UiText.F($"{Path.Combine("out", "nvngx_dlss.dll")} is missing from the engine folder"));
         }
 
         /// <summary>The fsr4vk provider the package ships (FSR 4.1.1 on any GPU, vk_fsr4vk.cpp).</summary>

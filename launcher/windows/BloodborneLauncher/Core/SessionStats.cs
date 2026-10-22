@@ -67,7 +67,7 @@ namespace BloodborneLauncher.Core
             Duration(Length) + (HasFrameStats
                 ? BloodborneLauncher.Core.UiText.F($" · {AverageFps:0} FPS average (lowest {LowestFps:0}) · worst frame {WorstFrameMs:0} ms · ") +
                   (Stutters == 1 ? "1 stutter" : $"{Stutters} stutters")
-                : " · turn on Frame statistics (More › Advanced) for FPS and stutters") +
+                : "") +
             (RamEndMiB > 0 ? $" · RAM {RamStartMiB / 1024.0:0.0} → {RamEndMiB / 1024.0:0.0} GB" : "");
 
         public static string Duration(TimeSpan time) =>

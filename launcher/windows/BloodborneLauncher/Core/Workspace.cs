@@ -19,6 +19,7 @@ namespace BloodborneLauncher.Core
         public LauncherSettings Settings { get; } = new();
         public IniFile Ini { get; } = new();
         public GameRunner Game { get; } = new();
+        private readonly CheatLaunchNotice _cheatNotice = new();
         public TrophyTracker Trophies { get; } = new();
 
         /// <summary>A trophy was unlocked (or the saves folder, and so the list, changed).</summary>
@@ -77,12 +78,17 @@ namespace BloodborneLauncher.Core
 
             // Output arrives on the reader threads, often thousands of lines at once (the engine's
             // statistics when it exits): it is queued and handed on in batches, ten times a second.
-            Game.Output += line => _pendingOutput.Enqueue(line);
+            Game.Output += line =>
+            {
+                _pendingOutput.Enqueue(line);
+                if (_cheatNotice.Observe(line)) Dispatch(() => { if (Game.Running) Views.TrophyToast.AnnounceCheater(); });
+            };
             _outputTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(100) };
             _outputTimer.Tick += (_, _) => FlushOutput();
             _outputTimer.Start();
             Game.Exited += code => Dispatch(() =>
             {
+                _cheatNotice.Arm(false);
                 Log(code == 0 ? BloodborneLauncher.Core.UiText.T("The game exited normally.") : BloodborneLauncher.Core.UiText.F($"The game exited with code {code}."),
                     code == 0 ? LogLevel.Good : LogLevel.Warn);
                 _pendingOutput.Enqueue($"— the game exited (code {code}) —");
@@ -284,9 +290,11 @@ namespace BloodborneLauncher.Core
             var safeMode = Settings.Bool("safe_mode_next");
             Session = new SessionStats();
             _hdrBefore = WindowsHdr.Displays();
+            _cheatNotice.Arm(CheatLaunchNotice.AnyEnabled((key, fallback) => Ini.Get(key, fallback)));
             var error = Game.Start(Settings);
             if (error != null)
             {
+                _cheatNotice.Arm(false);
                 Log(BloodborneLauncher.Core.UiText.T(error), LogLevel.Bad);
                 return error;
             }

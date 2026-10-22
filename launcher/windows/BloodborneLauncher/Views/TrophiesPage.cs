@@ -15,7 +15,7 @@ namespace BloodborneLauncher.Views
         private readonly TextBlock _percent, _count, _points, _baseText, _dlcText;
         private readonly ProgressBar _overall, _base, _dlc;
         private readonly UniformGrid _grades = new() { Rows = 1, Margin = new Thickness(0, 16, 0, 0) };
-        private readonly StackPanel _list = new();
+        private readonly StackPanel _list = new OptionRows();
         private readonly InfoBar _support;
         private readonly TextBlock _logHint;
         private string _filter = "all";
@@ -23,20 +23,21 @@ namespace BloodborneLauncher.Views
         public TrophiesPage() : base(BloodborneLauncher.Core.UiText.T("Achievements"),
             BloodborneLauncher.Core.UiText.T("Bloodborne's 40 trophies, your completion rate, and the notification shown in game when one unlocks."))
         {
+            OptionRows.SetSplit(_list, false); // Achievement records remain a full-width list.
             _support = new InfoBar { IsClosable = false, Severity = InfoBarSeverity.Warning, Margin = new Thickness(0, 14, 0, 0) };
             Body.Children.Add(_support);
 
             // ==================== Completion ====================
             var card = new Card { Margin = new Thickness(0, 18, 0, 0) };
-            var stack = new StackPanel();
+            var stack = new OptionRows();
 
             var top = new Grid();
             top.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             top.ColumnDefinitions.Add(new ColumnDefinition());
-            _percent = new TextBlock { FontSize = 40, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+            _percent = new TextBlock { FontSize = 35, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
             _percent.SetResourceReference(TextBlock.FontFamilyProperty, "MonoFont");
             top.Children.Add(_percent);
-            var summary = new StackPanel { Margin = new Thickness(18, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+            var summary = new OptionRows { Margin = new Thickness(18, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
             summary.Children.Add(Text(BloodborneLauncher.Core.UiText.T("COMPLETION"), "StatLabel"));
             _count = Text("", "RowTitle");
             _points = Text("", "Faint");
@@ -92,9 +93,9 @@ namespace BloodborneLauncher.Views
             SettingToggle(SymbolRegular.Speaker224, BloodborneLauncher.Core.UiText.T("Play a sound"), null, "trophy_sound");
             SliderRow(SymbolRegular.Speaker124, BloodborneLauncher.Core.UiText.T("Volume"), null, 0, 100, 5, () => S.Int("trophy_volume"),
                 v => S.Set("trophy_volume", (int)v), "0");
-            Add(Card(SymbolRegular.MusicNote224, BloodborneLauncher.Core.UiText.T("Sound file"), BloodborneLauncher.Core.UiText.T("A .wav of your own; empty uses the built-in chime"), Row(
-                SmallButton(BloodborneLauncher.Core.UiText.T("Choose…"), SymbolRegular.FolderOpen24, (_, _) => ChooseSound()),
-                IconButton(SymbolRegular.ArrowUndo24, BloodborneLauncher.Core.UiText.T("Use the built-in chime"), (_, _) =>
+            Add(Card(SymbolRegular.MusicNote224, UiText.T("Sound file"), UiText.T("A sound of your own (WAV, MP3, MP4/M4A); empty uses the built-in chime"), Row(
+                SmallButton(UiText.T("Choose…"), SymbolRegular.FolderOpen24, (_, _) => ChooseSound()),
+                IconButton(SymbolRegular.ArrowUndo24, UiText.T("Use the built-in chime"), (_, _) =>
                 {
                     S.Set("trophy_sound_file", "");
                     Ws.SaveSoon();
@@ -142,7 +143,7 @@ namespace BloodborneLauncher.Views
 
         private static StackPanel Part(string name, out TextBlock text, out ProgressBar bar)
         {
-            var panel = new StackPanel { Margin = new Thickness(0, 0, 18, 0) };
+            var panel = new OptionRows { Margin = new Thickness(0, 0, 18, 0) };
             var row = new Grid();
             row.Children.Add(Text(BloodborneLauncher.Core.UiText.T(name), "Muted"));
             text = Text("", "Faint");
@@ -187,11 +188,11 @@ namespace BloodborneLauncher.Views
             {
                 var all = TrophyTracker.All.Where(x => x.Grade == grade).ToList();
                 var earned = all.Count(x => t.Unlocked.ContainsKey(x.Id));
-                var icon = new SymbolIcon { Symbol = SymbolRegular.Trophy24, Filled = true, FontSize = 18, Foreground = new SolidColorBrush(TrophyToast.GradeColor(grade)) };
+                var icon = new SymbolIcon { Symbol = SymbolRegular.Trophy24, Filled = true, FontSize = 15.75, Foreground = new SolidColorBrush(TrophyToast.GradeColor(grade)) };
                 var value = Text($"{earned} / {all.Count}", "StatValue");
                 value.Margin = new Thickness(8, 0, 0, 0);
                 var label = Text(BloodborneLauncher.Core.UiText.T(grade.ToString()), "StatLabel");
-                var col = new StackPanel();
+                var col = new OptionRows();
                 col.Children.Add(label);
                 col.Children.Add(Row(icon, value));
                 _grades.Children.Add(col);
@@ -221,7 +222,10 @@ namespace BloodborneLauncher.Views
                     ? new SolidColorBrush(TrophyToast.GradeColor(trophy.Grade))
                     : (Brush)FindResource("TextFillColorTertiaryBrush");
                 row.Opacity = earned ? 1 : 0.62;
-                row.ToolTip = BloodborneLauncher.Core.UiText.F($"{trophy.Grade} · {trophy.Points} points");
+                // The trophy's own picture from the game dump, grey until earned.
+                if (TrophyIcons.For(S, trophy.Id) is { } picture)
+                    row.SetPicture(picture, 36, grey: !earned);
+                row.ToolTip = UiText.F($"{UiText.T(trophy.Grade.ToString())} · {trophy.Points} points");
                 _list.Children.Add(row);
             }
             if (_list.Children.Count == 0)
@@ -230,7 +234,7 @@ namespace BloodborneLauncher.Views
 
         private void ChooseSound()
         {
-            var dialog = new Microsoft.Win32.OpenFileDialog { Title = BloodborneLauncher.Core.UiText.T("Trophy sound"), Filter = "WAV sound|*.wav" };
+            var dialog = new Microsoft.Win32.OpenFileDialog { Title = UiText.T("Trophy sound"), Filter = UiText.T("Sound files|*.wav;*.mp3;*.mp4;*.m4a;*.aac;*.wma") };
             if (dialog.ShowDialog() != true) return;
             S.Set("trophy_sound_file", dialog.FileName);
             Ws.SaveSoon();

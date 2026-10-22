@@ -224,7 +224,7 @@ namespace BloodborneLauncher
             WindowsCaptionButtons.Children.OfType<System.Windows.Controls.Button>().Last().ToolTip=BloodborneLauncher.Core.UiText.T("Close");
             UpdateAudioToggle();_pages.Clear();NavigatePage(current);
             SelectSidebar(current==typeof(MenuHomePage)?"home":current==typeof(PlayPage)?"play":
-                current==typeof(GraphicsPage)?"graphics":current==typeof(DisplayPage)?"display":
+                current==typeof(GraphicsPage)?"graphics":
                 current==typeof(ControlsPage)?"controls":current==typeof(CheatsPage)?"cheats":
                 current==typeof(OnlinePage)?"online":current==typeof(TrophiesPage)?"trophies":current==typeof(MorePage)?"mods":"advanced");
         }
@@ -360,7 +360,7 @@ namespace BloodborneLauncher
         private void BuildSidebar()
         {
             foreach (var (key,label) in new[] {
-                ("home","Start"),("play","Game"),("display","Display"),("graphics","Graphics"),
+                ("home","Start"),("play","Game"),("graphics","Graphics"),
                 ("controls","Controls"),("cheats","Tweaks"),("online","Online"),
                 ("trophies","Achievements"),("advanced","Settings"),("mods","More") })
             {
@@ -427,19 +427,23 @@ namespace BloodborneLauncher
                 if(_closed || request!=_navigationRequest)return;
             }
             else MenuTransition.Reset(PageFrame);
+            _shownRefresh?.Abort(); _shownRefresh = null;
             var page = GetPage(type);
+            BackdropShade.Fill = type == typeof(MenuHomePage) ? HomeShade : PageShade;
+            SettingsShade.Visibility = type == typeof(MenuHomePage) ? Visibility.Collapsed : Visibility.Visible;
             if (!ReferenceEquals(PageFrame.Content,page))
             {
+                PageFrame.Opacity = 0;
                 PageFrame.Content=BloodborneLauncher.Core.UiText.T(page);
+                using (LauncherDiagnostics.Measure("Refresh before transition " + page.GetType().Name)) page.OnShown();
+                // Expand templates and settle responsive columns before animation clocks begin.
+                PageFrame.UpdateLayout();
                 MenuTransition.Enter(PageFrame,page is not MenuHomePage,()=>{
                     if(_closed || request!=_navigationRequest)return;
                     _navigationInProgress=false;QueueNavigationCleanup();
                 });
             }
-            else { _navigationInProgress=false;QueueNavigationCleanup(); }
-            BackdropShade.Fill = type == typeof(MenuHomePage) ? HomeShade : PageShade;
-            SettingsShade.Visibility = type == typeof(MenuHomePage) ? Visibility.Collapsed : Visibility.Visible;
-            RefreshAfterNavigation(page);
+            else { _navigationInProgress=false;RefreshAfterNavigation(page);QueueNavigationCleanup(); }
         }
 
         /// <summary>Preserve links from existing setting pages and diagnostics.</summary>
@@ -447,13 +451,13 @@ namespace BloodborneLauncher
         {
             var type = page switch {
                 "controls" => typeof(ControlsPage), "graphics" => typeof(GraphicsPage),
-                "display" => typeof(DisplayPage), "trophies" => typeof(TrophiesPage),
+                "display" => typeof(GraphicsPage), "trophies" => typeof(TrophiesPage),
                 "online" => typeof(OnlinePage), "cheats" => typeof(CheatsPage),
                 "advanced" => typeof(SettingsPage), "mods" or "output" => typeof(MorePage),
                 _ => typeof(PlayPage),
             };
             NavigatePage(type);
-            SelectSidebar(page == "output" ? "mods" : page);
+            SelectSidebar(page == "output" ? "mods" : page == "display" ? "graphics" : page);
             if (type == typeof(MorePage)) ((MorePage)GetPage(type)).ShowSection(page);
         }
 
@@ -719,7 +723,7 @@ namespace BloodborneLauncher
                 ((MenuHomePage)home).SetRunning(Workspace.Current.Game.Running);
             var running = Workspace.Current.Game.Running;
             foreach (var page in _pages.Values)
-                (page as PlayPage)?.UpdateRunning();
+                (page as MenuHomePage)?.UpdateSessionStatus();
         }
 
     }

@@ -1,16 +1,14 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Integration 20: a separate engine checkout avoids stale files from prior online layouts.
+# Integration 29: build the complete in-tree beta 8 source in a separate target.
 set -euo pipefail
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-engine_source="${1:-$root/../BetterKBM-engine}"
-engine_target="${2:-$root/../BetterKBM-engine-beta6}"
-previous="${BB_PREVIOUS_ENGINE:-$root/../BetterKBM-engine-beta5}"
+# Keep the previous two-argument convention; the old base checkout is no longer needed.
+engine_target="${2:-${BB_ENGINE_TARGET:-$root/../BetterKBM-engine-beta8}}"
+previous="${BB_PREVIOUS_ENGINE:-$root/../BetterKBM-engine-beta6}"
 [[ -d "$previous" ]] || previous="$root/../BetterKBM-engine-expanded"
-tag="v0.4.0-darkizuku-preview.1"
-patch="$root/engine/bbhost-changes.patch"
 [[ ${MSYSTEM:-} == CLANG64 ]] || { echo 'Open MSYS2 CLANG64 and run this script there.' >&2; exit 1; }
-for executable in git cmake ninja clang python3 cygpath curl; do
+for executable in cmake ninja clang python3 cygpath curl; do
     command -v "$executable" >/dev/null || { printf 'Missing dependency: %s\n' "$executable" >&2; exit 1; }
 done
 for header in expat.h nlohmann/json.hpp; do
@@ -18,64 +16,80 @@ for header in expat.h nlohmann/json.hpp; do
         echo 'Run: pacman -S --needed mingw-w64-clang-x86_64-expat mingw-w64-clang-x86_64-nlohmann-json' >&2; exit 1;
     }
 done
-git -C "$engine_source" rev-parse --git-dir >/dev/null
-expected="$(git -C "$engine_source" rev-parse "${tag}^{commit}")"
-if [[ ! -e "$engine_target" ]]; then
-    git -C "$engine_source" worktree add --detach "$engine_target" "$tag"
-fi
-engine_target="$(cd -- "$engine_target" && pwd)"
-[[ "$expected" == "$(git -C "$engine_target" rev-parse HEAD)" ]] || {
-    echo 'The target has a different engine base. Choose a new empty directory as argument 2.' >&2; exit 1;
-}
-if git -C "$engine_target" apply --reverse --check --ignore-space-change "$patch" 2>/dev/null; then
-    echo 'Integration 20 is already applied; rebuilding.'
-elif git -C "$engine_target" apply --check --ignore-space-change "$patch" 2>/dev/null; then
-    git -C "$engine_target" apply --whitespace=nowarn --ignore-space-change "$patch"
-else
-    echo 'The target contains different source changes. Keep it and choose a new empty directory as argument 2.' >&2
-    exit 1
-fi
-# Verify actual source bytes, including the renderer, before producing a build stamp.
-python3 "$root/tools/verify-engine-sources.py" "$engine_target" "$root/engine/better-kbm-manifest.json"
-git -C "$engine_target" submodule update --init --recursive
-cp -- "$root/engine/win_compat.h" "$engine_target/gpu/win_compat.h"
-# Copy player data and provider assets once; never copy old engine binaries or old shader caches.
-python3 - "$previous" "$engine_target" <<'PY'
+python3 "$root/tools/verify-engine-sources.py" "$root/engine" "$root/engine/better-kbm-manifest.json"
+python3 - "$root/engine" "$engine_target" "$previous" <<'PY'
 from pathlib import Path
-import os,sys,shutil,time
-old,new=map(Path,sys.argv[1:])
-if old.resolve()!=new.resolve() and old.is_dir():
+import hashlib,json,shutil,sys,time,os,subprocess
+source,target,previous=map(Path,sys.argv[1:]);manifest=json.loads((source/'better-kbm-manifest.json').read_text())
+def digest(p):
+    data=p.read_bytes()
+    if b'\0' not in data:data=data.replace(b'\r\n',b'\n')
+    return hashlib.sha256(data).hexdigest()
+record=target/'better-kbm-source-manifest.json'
+old=json.loads(record.read_text()) if record.exists() else None
+if target.exists() and any(target.iterdir()) and not old:
+    raise SystemExit('Choose a new empty target directory. The previous engine has not been modified.')
+for name,item in manifest['files'].items():
+    p=target/name
+    if p.exists() and old and digest(p) not in {item['after'],old.get('files',{}).get(name,{}).get('after')}:
+        raise SystemExit('Local source changes in '+str(p)+'. Keep this folder and choose a new target.')
+if old:
+    obsolete=set(old.get('files',{}))-set(manifest['files'])
+    for name in obsolete:
+        p=target/name
+        if p.exists() and digest(p)!=old['files'][name]['after']:
+            raise SystemExit('Local source changes in obsolete file '+str(p)+'. Choose a new target.')
+    for name in obsolete:
+        p=target/name
+        if p.is_file():p.unlink()
+for name in manifest['files']:
+    p=target/name;p.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(source/name,p)
+record.write_text(json.dumps(manifest,indent=2)+'\n')
+# Prefer the engine actually selected by the launcher; an explicit override wins.
+if not os.environ.get('BB_PREVIOUS_ENGINE') and os.environ.get('APPDATA'):
+    def local_path(value):
+        p=Path(value)
+        if p.exists():return p
+        result=subprocess.run(['cygpath','-u',value],capture_output=True,text=True)
+        return Path(result.stdout.strip()) if result.returncode==0 else p
+    try:
+        appdata=local_path(os.environ['APPDATA'])
+        for folder in ['Lantern Engine','bbport-launcher']:
+            config=appdata/folder/'settings.json'
+            if not config.exists():continue
+            selected=json.loads(config.read_text(encoding='utf-8-sig')).get('port_dir','')
+            if not selected:continue
+            active=local_path(selected)
+            if (active/'engine/scripts/run_windows.py').exists():active=active/'engine'
+            if active.is_dir() and active.resolve()!=target.resolve():previous=active;break
+    except (OSError,ValueError):pass
+if previous.resolve()!=target.resolve() and previous.is_dir():
     for name in ['lantern.ini','bbport.ini','mods.json','patches.json','user','mods','network','engine-assets','fsr4_shaders','fsr4_411','fsr4vk','shader-catalog']:
-        src,dst=old/name,new/name
+        src=previous/name
         if not src.exists():continue
-        files=[src] if src.is_file() else (p for p in src.rglob('*') if p.is_file())
-        for p in files:
+        for p in [src] if src.is_file() else (p for p in src.rglob('*') if p.is_file()):
             relative=Path(name) if src.is_file() else Path(name)/p.relative_to(src)
             if 'cache' in relative.parts or '__pycache__' in relative.parts:continue
-            target=new/relative
-            if not target.exists():
-                target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(p,target)
-if not (new/'lantern.ini').exists() and (new/'bbport.ini').exists():shutil.copy2(new/'bbport.ini',new/'lantern.ini')
+            dest=target/relative
+            if not dest.exists():dest.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(p,dest)
+if not (target/'lantern.ini').exists() and (target/'bbport.ini').exists():shutil.copy2(target/'bbport.ini',target/'lantern.ini')
 now=time.time()
-for p in new.rglob('*'):
-    if p.is_file() and '.git' not in p.parts and p.stat().st_mtime>now:os.utime(p,(now,now))
+for name in manifest['files']:
+    p=target/name
+    if p.stat().st_mtime>now:p.touch()
 PY
+engine_target="$(cd -- "$engine_target" && pwd)"
+python3 "$root/tools/verify-engine-sources.py" "$engine_target" "$root/engine/better-kbm-manifest.json"
 compat_windows="$(cygpath -m "$engine_target/gpu/win_compat.h")"
 export CFLAGS="${CFLAGS:-} -Wno-error=unused-but-set-global"
 export CXXFLAGS="-include \"$compat_windows\" ${BB_EXTRA_CXXFLAGS:-}"
 (
     cd -- "$engine_target"
-    # Discard cached compiler flags, then let build.sh choose the upstream build options.
     cmake --fresh -S gpu -B out/gpu -G Ninja
     bash build.sh
     bash tools/fetch_dlss.sh
-    # FSR assets are only needed when selected. Existing assets are reused without replacing them.
-    if grep -Eq '^upscaler[[:space:]]*=[[:space:]]*fsr4[[:space:]]*$' lantern.ini 2>/dev/null; then
-        bash tools/fetch_fsr4_assets.sh
-    fi
-    if grep -Eq '^frame_gen[[:space:]]*=[[:space:]]*dlss[[:space:]]*$' lantern.ini 2>/dev/null; then
-        bash tools/fetch_streamline.sh
-    fi
+    if grep -Eq '^upscaler[[:space:]]*=[[:space:]]*fsr4[[:space:]]*$' lantern.ini 2>/dev/null; then bash tools/fetch_fsr4_assets.sh; fi
+    if grep -Eq '^frame_gen[[:space:]]*=[[:space:]]*dlss[[:space:]]*$' lantern.ini 2>/dev/null; then bash tools/fetch_streamline.sh; fi
 )
 for program in bb-probe.exe bb-engine-assets.exe bb-start.exe bb-shader-lab.exe; do
     [[ -s "$engine_target/out/$program" ]] || { printf 'Missing built program: %s\n' "$program" >&2; exit 1; }
@@ -85,13 +99,12 @@ python3 - "$engine_target" <<'PY'
 from pathlib import Path
 import hashlib,json,sys,datetime
 root=Path(sys.argv[1]);out=root/'out'
-stamp={'integration':'better-kbm-expanded','version':20,'upstream':'1ce45ae7747623b9792d54566cd5290a380555a1','upstream_release':'0.9.37 beta 6','built_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+stamp={'integration':'better-kbm-native-source','version':29,'upstream':'f029d89e934f0f8aac672e80c41e35caa9bd4146','upstream_release':'0.9.37 beta 8','built_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
        'executables':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in [out/'bb-probe.exe',out/'bb-start.exe',out/'bb-shader-lab.exe',out/'bb-engine-assets.exe']}}
 (out/'better-kbm-build.json').write_text(json.dumps(stamp),encoding='utf-8')
 print('Verified native build:',stamp['upstream_release'],stamp['upstream'])
 PY
 bash "$root/tools/build-launcher-only.sh"
-printf '\nLauncher: %s\nEngine folder: %s\n' \
-    "$(cygpath -w "$root/LauncherApp/Bloodborne Launcher.exe")" "$(cygpath -w "$engine_target")"
-echo 'IMPORTANT: select the NEW BetterKBM-engine-beta6 folder in the launcher before testing.'
-echo 'The session log must say: BetterKBM native engine integration 20 | upstream 1ce45ae7...'
+printf '\nLauncher: %s\nEngine folder: %s\n' "$(cygpath -w "$root/LauncherApp/Bloodborne Launcher.exe")" "$(cygpath -w "$engine_target")"
+echo 'IMPORTANT: select the NEW BetterKBM-engine-beta8 folder in the launcher before testing.'
+echo 'The session log must say: BetterKBM native engine integration 29 | upstream f029d89e...'

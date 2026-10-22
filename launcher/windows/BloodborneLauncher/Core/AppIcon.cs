@@ -13,10 +13,10 @@ namespace BloodborneLauncher.Core
     {
         public static readonly Choice[] Choices =
         {
-            new(L.T("Auto"), "auto", L.T("Red lantern in betas, blue in stable releases")),
-            new(L.T("Red lantern"), "red"),
-            new(L.T("Blue lantern"), "blue"),
-            new(L.T("Lantern by j3loo"), "j3loo", L.T("Fan art by j3loo")),
+            new(UiText.T("Auto"), "auto", UiText.T("Red lantern in betas, blue in stable releases")),
+            new(UiText.T("Red lantern"), "red"),
+            new(UiText.T("Blue lantern"), "blue"),
+            new(UiText.T("Lantern by j3loo"), "j3loo", UiText.T("Fan art by j3loo")),
         };
 
         private static string Resource(string choice) => choice switch

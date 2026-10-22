@@ -9,6 +9,37 @@ namespace BloodborneLauncher
     {
         private static readonly string CrashLog = Path.Combine(Core.Paths.ConfigDir, "crash.log");
 
+        /// <summary>When this launcher runs outside a package and the settings name one with its own
+        /// launcher, that launcher is started with the same arguments (once: BB_LAUNCHER_HANDOVER).
+        /// A build from the source checkout keeps running itself.</summary>
+        private static bool HandOverToPackage(string[] args)
+        {
+            try
+            {
+                if (Environment.GetEnvironmentVariable("BB_LAUNCHER_HANDOVER") == "1" ||
+                    Core.Paths.DetectPortDir() != null || Core.Paths.SourceRoot != null ||
+                    Environment.ProcessPath is not { } self || !File.Exists(Core.Paths.ConfigFile))
+                    return false;
+                using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Core.Paths.ConfigFile));
+                if (!doc.RootElement.TryGetProperty("port_dir", out var value) || value.ValueKind != System.Text.Json.JsonValueKind.String)
+                    return false;
+                var package = Core.Paths.Expand(value.GetString() ?? "");
+                var launcher = Path.Combine(package, Path.GetFileName(self));
+                if (!Core.Paths.IsPortDir(package) || !File.Exists(launcher) ||
+                    string.Equals(Path.GetFullPath(launcher), Path.GetFullPath(self), StringComparison.OrdinalIgnoreCase))
+                    return false;
+                var start = new System.Diagnostics.ProcessStartInfo(launcher) { UseShellExecute = false, WorkingDirectory = package };
+                foreach (var arg in args) start.ArgumentList.Add(arg);
+                start.Environment["BB_LAUNCHER_HANDOVER"] = "1";
+                System.Diagnostics.Process.Start(start)?.Dispose();
+                return true;
+            }
+            catch (Exception)
+            {
+                return false; // runs itself, as before
+            }
+        }
+
         protected override async void OnStartup(StartupEventArgs e)
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -28,6 +59,7 @@ namespace BloodborneLauncher
                 catch(Exception error){Console.Error.WriteLine(error.GetBaseException().Message);Shutdown(1);}
                 return;
             }
+            if (HandOverToPackage(e.Args)) { Shutdown(); return; }
             System.Windows.Media.RenderOptions.ProcessRenderMode = Core.LauncherRenderPolicy.UseSoftware(e.Args)
                 ? System.Windows.Interop.RenderMode.SoftwareOnly
                 : System.Windows.Interop.RenderMode.Default;

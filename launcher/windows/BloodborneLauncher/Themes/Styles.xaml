@@ -12,20 +12,20 @@
 
     <!-- Section heading above a group of cards -->
     <Style x:Key="GroupHeader" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="FontSize" Value="10.9375" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
         <Setter Property="Margin" Value="4,12,0,5" />
     </Style>
 
     <Style x:Key="PageTitle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="17" />
+        <Setter Property="FontSize" Value="14.875" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
     </Style>
 
     <Style x:Key="PageSubtitle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="FontSize" Value="10.9375" />
         <Setter Property="Margin" Value="0,3,0,0" />
         <Setter Property="MaxWidth" Value="520" />
         <Setter Property="HorizontalAlignment" Value="Left" />
@@ -34,26 +34,26 @@
     </Style>
 
     <Style x:Key="RowTitle" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontSize" Value="12.25" />
         <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
     <Style x:Key="Muted" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="FontSize" Value="10.9375" />
         <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
         <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
 
     <Style x:Key="Faint" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="FontSize" Value="10.9375" />
         <Setter Property="Foreground" Value="{DynamicResource TextFillColorTertiaryBrush}" />
         <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
 
     <Style x:Key="StatValue" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
-        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontSize" Value="13.125" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
         <Setter Property="Margin" Value="0,4,0,0" />
@@ -61,14 +61,14 @@
     </Style>
 
     <Style x:Key="StatLabel" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="11.5" />
+        <Setter Property="FontSize" Value="10.0625" />
         <Setter Property="Foreground" Value="{DynamicResource TextFillColorTertiaryBrush}" />
     </Style>
 
     <!-- Read-only monospaced output (the game's log) -->
     <Style x:Key="CodeBox" TargetType="TextBox">
         <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
-        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontSize" Value="10.5" />
         <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
         <Setter Property="Background" Value="{DynamicResource PanelDeepBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />

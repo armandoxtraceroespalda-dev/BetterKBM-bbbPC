@@ -41,7 +41,7 @@ namespace BloodborneLauncher.Views
             if (!string.IsNullOrEmpty(message))
             {
                 var text = LauncherPage.Text(BloodborneLauncher.Core.UiText.T(message), "Muted");
-                text.FontSize = 16;
+                text.FontSize = 14;
                 text.Margin = new Thickness(0, 8, 0, 4);
                 text.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
                 // A long message (an import's list of changes) scrolls instead of pushing the buttons
@@ -77,7 +77,10 @@ namespace BloodborneLauncher.Views
             }
 
             // Two equal-width buttons along the bottom, the action on the right.
-            var buttons = new UniformGrid { Rows = 1, Margin = new Thickness(0, 22, 0, 0), HorizontalAlignment = HorizontalAlignment.Right };
+            Panel buttons = choices == null
+                ? new UniformGrid { Rows = 1, HorizontalAlignment = HorizontalAlignment.Right }
+                : new WrapPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+            buttons.Margin = new Thickness(0, 22, 0, 0);
             if (choices != null)
             {
                 // Several actions: equal widths, the last one the main action.
@@ -88,7 +91,11 @@ namespace BloodborneLauncher.Views
                     var last = i == choices.Length - 1;
                     var button = new Button
                     {
-                        Content = UiText.T(choices[i]),
+                        Content = new TextBlock { Text = UiText.T(choices[i]), TextWrapping = TextWrapping.Wrap,
+                            TextAlignment = TextAlignment.Center },
+                        Width = Math.Clamp(UiText.T(choices[i]).Length * 9.5 + 36, 110, 300),
+                        MinHeight = 44,
+                        Padding = new Thickness(12, 7, 12, 7),
                         Margin = new Thickness(0, 0, last ? 0 : 8, 0),
                         HorizontalAlignment = HorizontalAlignment.Stretch,
                         Appearance = last ? ControlAppearance.Primary : ControlAppearance.Secondary,
@@ -114,7 +121,9 @@ namespace BloodborneLauncher.Views
 
             var card = new Border
             {
-                Width = 440,
+                Width = choices == null ? 440 : Math.Min(820, Math.Max(440,
+                    choices.Sum(c => Math.Clamp(UiText.T(c).Length * 9.5 + 36, 110, 300) + 8) + 48)),
+                MaxWidth = owner == null ? 900 : Math.Max(260, owner.ActualWidth - 48),
                 Padding = new Thickness(24, 20, 24, 20),
                 CornerRadius = new CornerRadius(LauncherAppearance.Bloodborne ? 0 : 16),
                 BorderThickness = new Thickness(1),

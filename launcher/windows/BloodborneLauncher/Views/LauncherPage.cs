@@ -48,82 +48,175 @@ namespace BloodborneLauncher.Views
         /// <summary>Classic layout: one card per setting with its icon and description, as before 0.9.4.</summary>
         public static bool Classic => true;
 
+        private readonly TextBlock _name;
+        private readonly StackPanel _text;
+        private readonly Grid _grid;
+        private readonly UIElement? _control;
+        private readonly bool _wide;
+        private readonly string? _info;
+        private TextBlock? _description;
+        private string? _note;
+        private string? _lastHelp;
+        public bool NoteInTooltip { get; set; }
+        public bool TightLabel { get; set; }
+        public void StyleNameAsHeading()
+        {
+            _name.SetResourceReference(StyleProperty, "GroupHeader");
+            _name.FontSize = 21.875;
+            _name.FontFamily = LauncherAppearance.MenuFont;
+            _name.SetResourceReference(TextBlock.ForegroundProperty, "SectionHeadingBrush");
+            _name.Margin = new Thickness(0);
+        }
+
         public SettingRow(SymbolRegular icon, string title, string? info, object? control, bool wide)
         {
-            MinHeight = 70;
-            CornerRadius = new CornerRadius(0);
+            _symbol = icon; _control = control as UIElement; _wide = wide; _info = UiText.T(info);
             Margin = new Thickness(0, 0, 0, 2);
-
-            _symbol = icon;
-
-            var name = new TextBlock { Text = BloodborneLauncher.Core.UiText.T(title), FontSize = LauncherAppearance.Bloodborne ? 22 : 15, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
-            Hint = new TextBlock { FontSize = 16, FontFamily = LauncherAppearance.DetailFont, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 3, 0, 0), Visibility = Visibility.Collapsed };
-            Hint.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorTertiaryBrush");
-
-            var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-            text.Children.Add(name);
-            if (Classic && !string.IsNullOrWhiteSpace(info))
-            {
-                // Classic shows the description under the title instead of in a tooltip.
-                var description = new TextBlock { Text = BloodborneLauncher.Core.UiText.T(info), FontSize = 16, FontFamily = LauncherAppearance.DetailFont, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) };
-                description.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
-                text.Children.Add(description);
-            }
-
-            var grid = new Grid();
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            _iconGrid = grid;
-            if (Classic && !LauncherAppearance.Bloodborne) ShowIcon = true;
-            Grid.SetColumn(text, 1);
-            grid.Children.Add(text);
-
-            if (control is UIElement element)
-            {
-                if (wide)
-                {
-                    // Title on its own line, the control across the row, the hint under it.
-                    grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                    grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                    if (element is FrameworkElement fe) fe.Margin = new Thickness(0, 8, 0, 0);
-                    Grid.SetRow(element, 1);
-                    Grid.SetColumn(element, 1);
-                    Grid.SetColumnSpan(element, 2);
-                    grid.Children.Add(element);
-                    grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                    Grid.SetRow(Hint, 2);
-                    Grid.SetColumn(Hint, 1);
-                    Grid.SetColumnSpan(Hint, 2);
-                    grid.Children.Add(Hint);
-                }
-                else
-                {
-                    text.Children.Add(Hint);
-                    if (element is FrameworkElement fe) fe.Margin = new Thickness(12, 0, 0, 0);
-                    Grid.SetColumn(element, 2);
-                    grid.Children.Add(element);
-                }
-            }
-            else
-                text.Children.Add(Hint);
-
-            BorderThickness = new Thickness(0);
             Background = Brushes.Transparent;
-            Padding = new Thickness(18, 12, 18, 16);
-            var surface = new Grid();
-            // Rows retain their classic title/description arrangement; only controls glow.
-            surface.Children.Add(grid);
+            _name = new TextBlock { Text = UiText.T(title), FontSize = 19.25,
+                VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
+            Hint = new TextBlock { FontSize = 14, FontFamily = LauncherAppearance.DetailFont,
+                TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 3, 0, 0), Visibility = Visibility.Collapsed };
+            Hint.SetResourceReference(TextBlock.ForegroundProperty, "WarningTextBrush");
+            _text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            _text.Children.Add(_name);
+            _grid = new Grid(); _iconGrid = _grid;
+            _grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            _grid.ColumnDefinitions.Add(new ColumnDefinition());
+            _grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            _grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            _grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            _grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            Grid.SetColumn(_text, 1); _grid.Children.Add(_text);
+            if (_control != null) _grid.Children.Add(_control);
+            Grid.SetColumn(Hint, 1); Grid.SetColumnSpan(Hint, 2); Grid.SetRow(Hint, 2); _grid.Children.Add(Hint);
+            var surface = new Grid(); surface.Children.Add(_grid);
             var line = new System.Windows.Shapes.Rectangle { Height = 1, VerticalAlignment = VerticalAlignment.Bottom,
                 IsHitTestVisible = false, Opacity = 0.65 };
             line.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "CardStrokeColorDefaultBrush");
-            surface.Children.Add(line);
-            Child = surface;
-            if (LauncherAppearance.Bloodborne)
+            surface.Children.Add(line); Child = surface;
+            if (control is Control item) item.FontFamily = item is System.Windows.Controls.TextBox
+                ? LauncherAppearance.DetailFont : LauncherAppearance.MenuFont;
+            SizeChanged += (_, _) => UpdateLayoutMode();
+            UpdateLayoutMode();
+        }
+
+        public void SetNote(string? note)
+        {
+            _note = note;
+            UpdateHelp();
+            Hint.Text = note ?? "";
+            Hint.Visibility = MenuHelp.GetCompact(this) && NoteInTooltip || string.IsNullOrEmpty(note)
+                ? Visibility.Collapsed : Visibility.Visible;
+        }
+        private void UpdateHelp()
+        {
+            string text = string.Join("\n\n", new[] { _info, _note }.Where(v => !string.IsNullOrWhiteSpace(v)).Distinct());
+            if (text == _lastHelp) return;
+            _lastHelp = text; MenuHelp.Attach(this, string.IsNullOrEmpty(text) ? null : text);
+        }
+        internal void UpdateLayoutMode()
+        {
+            if (_grid == null) return;
+            bool compact = MenuHelp.GetCompact(this);
+            _name.TextWrapping = compact ? TextWrapping.Wrap : TextWrapping.NoWrap;
+            _name.TextTrimming = compact ? TextTrimming.None : TextTrimming.CharacterEllipsis;
+            Hint.SetResourceReference(TextBlock.ForegroundProperty, compact ? "WarningTextBrush" : "TextFillColorTertiaryBrush");
+            MinHeight = compact ? 50 : 70;
+            Padding = compact ? new Thickness(10, 7, 10, 9) : new Thickness(18, 12, 18, 16);
+            if (!compact && !string.IsNullOrWhiteSpace(_info) && _description == null)
             {
-                if (control is Control item) item.FontFamily = item is System.Windows.Controls.TextBox ? LauncherAppearance.DetailFont : LauncherAppearance.MenuFont;
+                _description = new TextBlock { Text = _info, FontSize = 14, FontFamily = LauncherAppearance.DetailFont,
+                    TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) };
+                _description.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+                _text.Children.Add(_description);
+            }
+            if (_description != null) _description.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+            double space = Math.Max(100, ActualWidth - Padding.Left - Padding.Right);
+            double gap = TightLabel ? 0 : Math.Clamp(space * 0.02, 6, 16);
+            _name.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            double labelMinimum = TightLabel ? Math.Max(1, _name.DesiredSize.Width + 2) : Math.Clamp(_name.DesiredSize.Width, 90, 260);
+            double controlMinimum = _control switch
+            {
+                ToggleSwitch => 60,
+                System.Windows.Controls.Primitives.ToggleButton => 60,
+                FrameworkElement { Width: <= 100 } small => Math.Max(40, small.Width),
+                Grid => 210,
+                _ => 150
+            };
+            bool slider = _control is FrameworkElement { Tag: "slider-value-track" };
+            bool toggle = _control is ToggleSwitch or System.Windows.Controls.Primitives.ToggleButton;
+            bool below = _wide || slider || compact && !toggle && _control != null && space < labelMinimum + gap + controlMinimum;
+            _grid.ColumnDefinitions[1].Width = !compact || below ? new GridLength(1, GridUnitType.Star)
+                : toggle ? new GridLength(1, GridUnitType.Star)
+                : new GridLength(TightLabel ? labelMinimum : Math.Min(320, Math.Max(labelMinimum, space * 0.36)));
+            _grid.ColumnDefinitions[2].Width = compact && !below && !toggle ? new GridLength(1, GridUnitType.Star) : GridLength.Auto;
+            if (_control != null)
+            {
+                Grid.SetRow(_control, below ? 1 : 0);
+                Grid.SetColumn(_control, below ? 1 : 2);
+                Grid.SetColumnSpan(_control, below ? 2 : 1);
+                if (_control is FrameworkElement fe)
+                {
+                    fe.Margin = slider ? new Thickness(0, 6, 0, 3) : below ? new Thickness(0, 5, 0, 0) : new Thickness(gap, 0, 0, 0);
+                    fe.HorizontalAlignment = slider ? HorizontalAlignment.Center : toggle ? HorizontalAlignment.Right
+                        : below ? HorizontalAlignment.Stretch : compact ? HorizontalAlignment.Left : HorizontalAlignment.Right;
+                    Fit(fe, below ? space : toggle ? Math.Min(80, space) : Math.Max(1, space - _grid.ColumnDefinitions[1].Width.Value - gap));
+                }
+            }
+            UpdateHelp();
+            if (NoteInTooltip) Hint.Visibility = compact || string.IsNullOrEmpty(Hint.Text) ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        /// <summary>A picture in the icon's place (a trophy's own), <paramref name="size"/> pixels
+        /// square; grey when <paramref name="grey"/>.</summary>
+        public void SetPicture(string file, double size, bool grey)
+        {
+            if (Icon.Parent is not Grid grid || Picture(file, (int)(size * 2), grey) is not { } source) return;
+            var image = new System.Windows.Controls.Image
+            {
+                Source = source, Width = size, Height = size, Margin = Icon.Margin, VerticalAlignment = VerticalAlignment.Center,
+            };
+            RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
+            grid.Children.Add(image);
+            Icon.Visibility = Visibility.Collapsed;
+        }
+
+        /// <summary>A picture file decoded at <paramref name="pixels"/> wide, frozen; null if it cannot be read.</summary>
+        public static ImageSource? Picture(string file, int pixels, bool grey = false)
+        {
+            try
+            {
+                var bitmap = new System.Windows.Media.Imaging.BitmapImage();
+                bitmap.BeginInit();
+                bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                bitmap.DecodePixelWidth = pixels;
+                bitmap.UriSource = new Uri(file);
+                bitmap.EndInit();
+                bitmap.Freeze();
+                if (!grey) return bitmap;
+                var gray = new System.Windows.Media.Imaging.FormatConvertedBitmap(bitmap, PixelFormats.Gray8, null, 0);
+                gray.Freeze();
+                return gray;
+            }
+            catch (Exception)
+            {
+                return null;
             }
         }
+
+        private static void Fit(FrameworkElement element, double available)
+        {
+            element.MaxWidth = Math.Max(1, available);
+            if (element is StackPanel { Orientation: Orientation.Horizontal } row)
+            {
+                double fixedWidth = row.Children.OfType<FrameworkElement>().Where(c => c is TextBlock || c is BloodborneLauncher.Controls.Button)
+                    .Sum(c => (double.IsNaN(c.Width) ? 34 : c.Width) + c.Margin.Left + c.Margin.Right);
+                foreach (var child in row.Children.OfType<FrameworkElement>().Where(c => c is not TextBlock && c is not BloodborneLauncher.Controls.Button))
+                    child.MaxWidth = Math.Max(60, available - fixedWidth - 12);
+            }
+        }
+
     }
 
     /// <summary>Native underline choices with mouse and keyboard activation.</summary>
@@ -132,14 +225,14 @@ namespace BloodborneLauncher.Views
         private readonly List<System.Windows.Controls.Button> _items=new();
         public int SelectedIndex { get; private set; }=-1;
         public event Action<int>? Changed;
-        public Segmented(IReadOnlyList<Choice> choices,Func<Choice,bool>? enabled=null,double spacing=4,bool uniform=false)
+        public Segmented(IReadOnlyList<Choice> choices,Func<Choice,bool>? enabled=null,double spacing=4,bool uniform=false,double fontSize=15.75,double minHeight=42)
         {
             Background=Brushes.Transparent;
             var grid=new Grid { HorizontalAlignment=uniform?HorizontalAlignment.Stretch:HorizontalAlignment.Center };
             for(int i=0;i<choices.Count;i++)
             {
                 grid.ColumnDefinitions.Add(new ColumnDefinition { Width=uniform?new GridLength(1,GridUnitType.Star):GridLength.Auto });int index=i;var choice=choices[i];
-                var item=new System.Windows.Controls.Button { Content=Short(choice.Label),MinHeight=42,Margin=new Thickness(spacing,0,spacing,0),
+                var item=new System.Windows.Controls.Button { Content=Short(choice.Label),FontSize=fontSize,MinHeight=minHeight,Margin=new Thickness(spacing,0,spacing,0),
                     HorizontalAlignment=HorizontalAlignment.Stretch,HorizontalContentAlignment=HorizontalAlignment.Center,
                     ToolTip=choice.Note??choice.Label,IsEnabled=enabled?.Invoke(choice)??true };
                 item.SetResourceReference(StyleProperty,"BloodborneSegmentButton");
@@ -201,6 +294,7 @@ namespace BloodborneLauncher.Views
         protected LauncherPage(string title, string subtitle, bool settingsShell=true)
         {
             _settingsShell=settingsShell;
+            MenuHelp.SetCompact(this, this is not PlayPage);
             var lease=ViewRetention.Register(this);
             ReleaseWhenDisposed(lease.Retire);
             Background = Brushes.Transparent;
@@ -210,18 +304,25 @@ namespace BloodborneLauncher.Views
             SetResourceReference(ForegroundProperty, "TextFillColorPrimaryBrush");
             SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty, "TextFillColorPrimaryBrush");
 
-            FontSize=21;
+            FontSize=18.375;
             if(!settingsShell) { Body=null!;Scroller=null!;return; }
 
             // The tab says which page this is; no page title.
-            Body = new StackPanel { Margin = new Thickness(22, 8, 22, 24), MaxWidth = 1080 };
-            Scroller = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = BloodborneLauncher.Core.UiText.T(Body) };
+            Body = new StackPanel { Margin = new Thickness(22, 8, 22, 24), MaxWidth = 1600 };
+            Scroller = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Content = BloodborneLauncher.Core.UiText.T(Body) };
+            Scroller.Loaded += (_, _) =>
+            {
+                // Audio occupies the bottom 42 DIPs. The shell already leaves 12;
+                // reserve the remaining 30 plus a 4-DIP gap on the scrollbar only.
+                if (Scroller.Template?.FindName("PART_VerticalScrollBar", Scroller) is System.Windows.Controls.Primitives.ScrollBar bar)
+                    bar.Margin = new Thickness(0, 0, 0, 34);
+            };
             var shell = new Grid { Margin = new Thickness(24, 8, 24, 12) };
             shell.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             shell.RowDefinitions.Add(new RowDefinition());
             shell.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            var heading = new Grid { Height = 44, MaxWidth = 1080 };
-            var label = new TextBlock { Text = BloodborneLauncher.Core.UiText.T(title), FontSize = 25, HorizontalAlignment = HorizontalAlignment.Center,
+            var heading = new Grid { Height = 44, MaxWidth = 1600 };
+            var label = new TextBlock { Text = BloodborneLauncher.Core.UiText.T(title), FontSize = 21.875, HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 2) };
             label.SetResourceReference(TextBlock.ForegroundProperty, "SectionHeadingBrush");
             heading.Children.Add(label);shell.Children.Add(heading);
@@ -263,19 +364,61 @@ namespace BloodborneLauncher.Views
         /// </summary>
         private void Sectionize()
         {
-            var children=Body.Children.Cast<UIElement>().ToList();Body.Children.Clear();
-            StackPanel? box=null;
-            foreach(var child in children)
+            var children = Body.Children.Cast<UIElement>().ToList(); Body.Children.Clear();
+            if (this is PlayPage)
             {
-                if(child is TextBlock { Tag:"group" }) { Body.Children.Add(child);box=null;continue; }
-                if(child is MenuSurface) { Body.Children.Add(child);box=null;continue; }
-                if(box==null)
+                StackPanel? box = null;
+                foreach (var child in children)
                 {
-                    box=new StackPanel();
-                    Body.Children.Add(new MenuSurface { Child=box,Padding=new Thickness(16,14,16,16),Margin=new Thickness(-8,0,-8,10) });
+                    if (child is TextBlock { Tag: "group" }) { Body.Children.Add(child); box = null; continue; }
+                    if (child is MenuSurface) { Body.Children.Add(child); box = null; continue; }
+                    if (box == null) { box = new StackPanel(); Body.Children.Add(new MenuSurface { Child = box,
+                        Padding = new Thickness(16,14,16,16), Margin = new Thickness(-8,0,-8,10) }); }
+                    box.Children.Add(child);
                 }
-                box.Children.Add(child);
+                return;
             }
+            var columns = new SettingsColumns();
+            SettingsSection? section = null; StackPanel? rows = null;
+            bool hasHeading = false;
+            void Begin(UIElement? heading = null)
+            {
+                hasHeading = heading != null;
+                rows = new OptionRows();
+                section = new SettingsSection(heading, new MenuSurface { Child = rows, Padding = new Thickness(10,8,10,12) })
+                    { Margin = new Thickness(0,0,0,16) };
+                columns.Children.Add(section);
+                if (this is ModsPage or OutputPage or TrophiesPage) SettingsColumns.SetFullWidth(section, true);
+                if (heading != null && SettingsColumns.GetFullWidth(heading)) SettingsColumns.SetFullWidth(section, true);
+                if (heading != null && SettingsColumns.GetTwoColumns(heading)) SettingsColumns.SetTwoColumns(section, true);
+            }
+            foreach (var child in children)
+            {
+                if (child is FrameworkElement { Tag: "standalone" })
+                {
+                    columns.Children.Add(child); SettingsColumns.SetFullWidth(child, true);
+                    section = null; rows = null; hasHeading = false; continue;
+                }
+                if (child is FrameworkElement { Tag: "group" }) { Begin(child); continue; }
+                if (child is StackPanel panel && panel.Children.OfType<TextBlock>().FirstOrDefault()?.Tag as string == "group")
+                {
+                    var title = panel.Children.OfType<TextBlock>().First();
+                    panel.Children.Remove(title);
+                    Begin(title);
+                    section!.SetBinding(VisibilityProperty, new System.Windows.Data.Binding("Visibility") { Source = panel });
+                    rows!.Children.Add(child); continue;
+                }
+                if (section == null) Begin();
+                if (hasHeading && child is TextBlock caption && !string.IsNullOrWhiteSpace(caption.Text))
+                {
+                    if (caption.Tag as string != "no-tooltip") MenuHelp.Attach(section!, caption.Text);
+                    // Instructions remain discoverable from the section, without permanent prose.
+                    caption.Visibility = Visibility.Collapsed;
+                }
+                rows!.Children.Add(child);
+                if (SettingsColumns.GetFullWidth(child)) SettingsColumns.SetFullWidth(section!, true);
+            }
+            Body.Children.Add(columns);
         }
 
         // ---------------------------------------------------------------- building blocks
@@ -307,6 +450,7 @@ namespace BloodborneLauncher.Views
 
         public static void SetHint(TextBlock hint, string? text)
         {
+            if (hint.Tag is SettingRow owner) { owner.SetNote(UiText.T(text)); return; }
             hint.Text = BloodborneLauncher.Core.UiText.T(text);
             hint.Visibility = string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
         }
@@ -389,6 +533,7 @@ namespace BloodborneLauncher.Views
             foreach (var choice in choices)
                 box.Items.Add(new ComboBoxItem { Content = choice.Label, Tag = choice.Value });
             var card = Add(Card(icon, BloodborneLauncher.Core.UiText.T(title), BloodborneLauncher.Core.UiText.T(hint), box, out note), into);
+            card.NoteInTooltip = true; note.Tag = card;
             box.SelectedIndex = Choices.IndexOf(choices, get());
             ShowNote(box.SelectedIndex);
             void FitSelection() { if(box.SelectedIndex>=0)box.Width=MenuSizing.SelectorWidth(choices[box.SelectedIndex].Label,width); }
@@ -444,7 +589,7 @@ namespace BloodborneLauncher.Views
             };
             var value = new TextBlock
             {
-                Width = valueWidth,
+                MinWidth = valueWidth,
                 TextAlignment = TextAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 10, 0),
@@ -457,7 +602,17 @@ namespace BloodborneLauncher.Views
                 set(slider.Value);
                 Ws.SaveSoon();
             };
-            Add(Card(icon, BloodborneLauncher.Core.UiText.T(title), BloodborneLauncher.Core.UiText.T(hint), Row(value, slider), out _), into);
+            // Reserve the measured value width before allocating the remaining track space.
+            var sliderRow = new Grid { Width = 330, Tag = "slider-value-track", VerticalAlignment = VerticalAlignment.Center };
+            sliderRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            sliderRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            slider.Width = double.NaN;
+            slider.MinWidth = 0;
+            slider.Margin = new Thickness(6, 0, 6, 0);
+            Grid.SetColumn(slider, 1);
+            sliderRow.Children.Add(value);
+            sliderRow.Children.Add(slider);
+            Add(Card(icon, BloodborneLauncher.Core.UiText.T(title), BloodborneLauncher.Core.UiText.T(hint), sliderRow, out _), into);
             return slider;
         }
 

@@ -14,13 +14,13 @@ namespace BloodborneLauncher.Views
     {
         public static readonly Choice[] Themes =
         {
-            new(L.T("Default"), "default"),
-            new(L.T("Crimson"), "crimson", L.T("The blood moon: deep red")),
-            new(L.T("Moonlight"), "moon", L.T("Pale blue, like the Moonlight Greatsword")),
-            new(L.T("Amber"), "amber", L.T("Lamplight gold")),
-            new(L.T("Nightmare"), "nightmare", L.T("Arcane violet")),
-            new(L.T("Verdant"), "verdant", L.T("Forbidden Woods green")),
-            new(L.T("Custom"), "custom", L.T("Your own colour, below")),
+            new(UiText.T("Default"), "default"),
+            new(UiText.T("Crimson"), "crimson", UiText.T("The blood moon: deep red")),
+            new(UiText.T("Moonlight"), "moon", UiText.T("Pale blue, like the Moonlight Greatsword")),
+            new(UiText.T("Amber"), "amber", UiText.T("Lamplight gold")),
+            new(UiText.T("Nightmare"), "nightmare", UiText.T("Arcane violet")),
+            new(UiText.T("Verdant"), "verdant", UiText.T("Forbidden Woods green")),
+            new(UiText.T("Custom"), "custom", UiText.T("Your own colour, below")),
         };
 
         private static readonly Dictionary<string, Color> Accents = new()
