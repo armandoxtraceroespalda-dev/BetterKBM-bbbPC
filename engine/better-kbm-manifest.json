@@ -1,11 +1,11 @@
 {
   "integration": "better-kbm-native-source",
-  "version": 29,
-  "launcher_source_revision": "f029d89e934f0f8aac672e80c41e35caa9bd4146",
+  "version": 33,
+  "launcher_source_revision": "08173e6cbfcfd2191594ca28ad8373c7e9ccc895",
   "upstream_repository": "Awakenchan/LanternEngine",
-  "upstream_release": "0.9.37 beta 8",
+  "upstream_release": "0.9.37 beta 9",
   "source_layout": "engine/ (vendored source; legacy patch files are not applied)",
-  "previous_upstream_revision": "1ce45ae7747623b9792d54566cd5290a380555a1",
+  "previous_upstream_revision": "f029d89e934f0f8aac672e80c41e35caa9bd4146",
   "files": {
     ".gitattributes": {
       "before": null,
@@ -29,7 +29,11 @@
     },
     "README.md": {
       "before": null,
-      "after": "890ad9d017c1f6e7b2b94d18a7a09b94a01a0922cbf39800455961a45ec82de5"
+      "after": "212ef5219c4a11bc882cdca262ab6757e528a95bf400948da4fd38047991eefa"
+    },
+    "UPSTREAM-beta8.md": {
+      "before": null,
+      "after": "dde5a47cd0cc07f39c83f9c864323f363605f3cbc626f09464270c5418b54ad7"
     },
     "build.sh": {
       "before": null,
@@ -41,11 +45,11 @@
     },
     "docs/COMPATIBILITY.md": {
       "before": null,
-      "after": "182040d1f23cbff31aa055abb46d83ada1c31945ce01fc980c0c45a4f216eb7f"
+      "after": "927737eae71ae5c138f646df0b13bda113b8b5a6a7a9976c38c2aa8d71d4bdc9"
     },
     "docs/EMULATION_REMOVAL_PLAN.md": {
       "before": null,
-      "after": "1a09b5f5e00fe6bf71d915c2a48cb897779e97c61bfb2457352393fdfd186343"
+      "after": "f9308c15aced2583aa83af356c123049e67d81935c68f56a5dd1e092c137af61"
     },
     "docs/MODS.md": {
       "before": null,
@@ -57,7 +61,7 @@
     },
     "docs/dlss_frame_generation.md": {
       "before": null,
-      "after": "21a907a8efacafb10d440a724d6981a55661c613e87dfda0e0eb23b616633e03"
+      "after": "196fa6a6ef20b5b625fcdb79498756666355477b46dcfd1094b3dc6a81c506b6"
     },
     "docs/hdr-scene-path.md": {
       "before": null,
@@ -157,7 +161,7 @@
     },
     "docs/pipeline_compiles.md": {
       "before": null,
-      "after": "12de24b5b81f3ae7cf4d5f0947871df773a52f83fa23c21722c1cbd91c22071c"
+      "after": "b72463e9a72723fc0f5b7e84b39b84f245d00d39955e40392f9d9aac41ee5b7c"
     },
     "docs/upscaler.md": {
       "before": null,
@@ -165,7 +169,7 @@
     },
     "gpu/CMakeLists.txt": {
       "before": null,
-      "after": "381ccaf9955f896aae66e0fd149e6ff980b851a3baea7938332b8629ed105a27"
+      "after": "3e8bc8b5e8a26ae5cbe9c5e3184744804f79d604075e48f020f9fbfaa3c4057b"
     },
     "gpu/VENDOR.txt": {
       "before": null,
@@ -219,13 +223,13 @@
       "before": null,
       "after": "b8ec6064350c494e10937e7388539b69be34700229ad0d991f968237f29408ec"
     },
-    "gpu/bbnet/include/core/libraries/kernel/threads/pthread.h": {
-      "before": null,
-      "after": "6fc4ca4ebd998a6b5624eb3119cdf1dd87cb6058d411769ee78b6e39db435da9"
-    },
     "gpu/bbnet/include/core/libraries/kernel/threads.h": {
       "before": null,
       "after": "e7389c63a4d7614898340cb8f08a5f484d3f6c0b1c970e555b15265f1ddce892"
+    },
+    "gpu/bbnet/include/core/libraries/kernel/threads/pthread.h": {
+      "before": null,
+      "after": "6fc4ca4ebd998a6b5624eb3119cdf1dd87cb6058d411769ee78b6e39db435da9"
     },
     "gpu/bbnet/include/core/libraries/libs.h": {
       "before": null,
@@ -1217,7 +1221,7 @@
     },
     "gpu/shadps4/core/libraries/videoout/driver.cpp": {
       "before": null,
-      "after": "8dd25e394d1513cf0443b35656b4611ecaed5963107c80fe57b8e6746e336003"
+      "after": "5e22543cee5465b2ad0af654c476a3291712bd131fd15f689e04f37a451d7b2a"
     },
     "gpu/shadps4/core/libraries/videoout/driver.h": {
       "before": null,
@@ -1833,19 +1837,19 @@
     },
     "gpu/shadps4/video_core/buffer_cache/buffer.cpp": {
       "before": null,
-      "after": "10e51136fcabba8000f30ac8667c642ee28a15e804500c168b26b3caa63b176a"
+      "after": "90ce5a309a39a9e567dae46ef548884d91b79b5e61c74871e0a8d314de809a58"
     },
     "gpu/shadps4/video_core/buffer_cache/buffer.h": {
       "before": null,
-      "after": "1e195d784a32217630235ba29f9676c263de2f878df0d4baada84a36eacefc13"
+      "after": "04a0d8b37d423e53aacbff6196f95c4247220d1bd11bcc9434460e3e6d48da71"
     },
     "gpu/shadps4/video_core/buffer_cache/buffer_cache.cpp": {
       "before": null,
-      "after": "5c3874312ac55639835be222beb771aeab698a43b539132a784e11143cca6599"
+      "after": "ceb1d68f1aab06ba83bd2a971476801259b1ece0c28deccedea1100d129815ad"
     },
     "gpu/shadps4/video_core/buffer_cache/buffer_cache.h": {
       "before": null,
-      "after": "ab8bce3e1e16fe3c4f4fdd826f96bfbad04cf56e9079530403cbd649691fb921"
+      "after": "73013d9ca704b3fc089b9e43a4b341a4a745b1ca67a252d881172e2ba45741af"
     },
     "gpu/shadps4/video_core/buffer_cache/fault_manager.cpp": {
       "before": null,
@@ -1927,6 +1931,10 @@
       "before": null,
       "after": "6ac08069175c519f9b13409ec6ad9646a610c664e807d791abd4f33266fc998a"
     },
+    "gpu/shadps4/video_core/host_shaders/fsr.comp": {
+      "before": null,
+      "after": "7287db28f7a5978745d541e3bbb5abdca3bfad15cde697b852c9479d2ce259f1"
+    },
     "gpu/shadps4/video_core/host_shaders/fsr/ffx_a.h": {
       "before": null,
       "after": "15b37af42560bd2f2d748d71b84fc3b0ba7ccf7c14fca013e3bac9dd8cf8b704"
@@ -1934,10 +1942,6 @@
     "gpu/shadps4/video_core/host_shaders/fsr/ffx_fsr1.h": {
       "before": null,
       "after": "9f33e63d3ee461b603c80a2373689b35c8addedffe0f3ddf1968d151b3dc1a2a"
-    },
-    "gpu/shadps4/video_core/host_shaders/fsr.comp": {
-      "before": null,
-      "after": "7287db28f7a5978745d541e3bbb5abdca3bfad15cde697b852c9479d2ce259f1"
     },
     "gpu/shadps4/video_core/host_shaders/fsr4_color.comp": {
       "before": null,
@@ -1954,6 +1958,10 @@
     "gpu/shadps4/video_core/host_shaders/hdr_output.frag": {
       "before": null,
       "after": "66c0dc9456497f96d7cd4ff67d151f57c99b8b566a18bf6e55a9c5ac782ee3c9"
+    },
+    "gpu/shadps4/video_core/host_shaders/indirect_clamp.comp": {
+      "before": null,
+      "after": "675998fcd4fe3e7ac90d8123dffe5b81974dacb4b89369bb02b7727a4ff90f55"
     },
     "gpu/shadps4/video_core/host_shaders/ms_image_blit.frag": {
       "before": null,
@@ -2153,7 +2161,7 @@
     },
     "gpu/shadps4/video_core/renderer_vulkan/vk_frame_generation.cpp": {
       "before": null,
-      "after": "e54869cc52d251506fb18d9d49bba0a85200babee48104878f0fe7aa780d97cd"
+      "after": "44ad9dee18e496f075fbfa4704d90542e1041bc3183c0498df018598363ba140"
     },
     "gpu/shadps4/video_core/renderer_vulkan/vk_frame_generation.h": {
       "before": null,
@@ -2269,19 +2277,19 @@
     },
     "gpu/shadps4/video_core/renderer_vulkan/vk_presenter.cpp": {
       "before": null,
-      "after": "7e7fd5092e2bbd64939fa9b50d19239cec021a95c1efa0a74eec91b009031d68"
+      "after": "81d0a53fdccb920db55fb784cc3a95affec41176c55a16c681c74d6823079eb1"
     },
     "gpu/shadps4/video_core/renderer_vulkan/vk_presenter.h": {
       "before": null,
-      "after": "21f6729a44f24e9898588d80d8d1f11eeb9492186d6382632cac28e6f4bcfd76"
+      "after": "4ce9c116dcd3894ee089fe4b42c43417f77c0615dd7c0439414ec94663673bce"
     },
     "gpu/shadps4/video_core/renderer_vulkan/vk_rasterizer.cpp": {
       "before": null,
-      "after": "eed83b4d7ef6e304b4b362b2b7109919df708396ee63be1fb5a457dc3327392f"
+      "after": "0b42c16e161bb5fd83bc6e836613f81b8de06f7711a5145be5a845900a9a16fb"
     },
     "gpu/shadps4/video_core/renderer_vulkan/vk_rasterizer.h": {
       "before": null,
-      "after": "34660946f1f41a96e326945ef68a94d599870ca85744a40094c9e5d1d44ec45b"
+      "after": "053b6374dc07360612f7778c852771bdcd3533e9abc0badac9646bb1ccfc1cbb"
     },
     "gpu/shadps4/video_core/renderer_vulkan/vk_resource_pool.cpp": {
       "before": null,
@@ -2293,11 +2301,11 @@
     },
     "gpu/shadps4/video_core/renderer_vulkan/vk_runtime.cpp": {
       "before": null,
-      "after": "a034e8a8e656082ebaef0cadd2c5fb027a0b383d8e7dc201881785427603f11f"
+      "after": "046eea0e414df46755b5ffff65919100a133b583c2d10655d773f77ffe457e3c"
     },
     "gpu/shadps4/video_core/renderer_vulkan/vk_runtime.h": {
       "before": null,
-      "after": "97034bb7b9e9f1326f9eb153383a1acfbc9409bdbed9d36b9d9bbc83ad2ea6fc"
+      "after": "9e3eafb0931e7c039c62d737e8158b4981d5ff6bf327652bf0ba6f3ffedb926e"
     },
     "gpu/shadps4/video_core/renderer_vulkan/vk_scene_resolution.cpp": {
       "before": null,
@@ -2349,11 +2357,11 @@
     },
     "gpu/shadps4/video_core/renderer_vulkan/vk_streamline.cpp": {
       "before": null,
-      "after": "c323748490df54f2e91b4cd3246c1b3e3f404a88f31a1d73d66d8b38a1865545"
+      "after": "44300f97eadfd20f8356b26d7347084081033860f97dede236c4a4e9c7d9ce4b"
     },
     "gpu/shadps4/video_core/renderer_vulkan/vk_streamline.h": {
       "before": null,
-      "after": "cd97f1315e59889ee94491293ae1d063e43fe462b092e65777dc8b302f13f1f1"
+      "after": "e0624254292124fbdc0464e38c3a34292163b9cc9f1d633818129f8af1b66961"
     },
     "gpu/shadps4/video_core/renderer_vulkan/vk_streamline_loader.h": {
       "before": null,
@@ -2513,15 +2521,15 @@
     },
     "gpu/shim/bbport_guest_memory.cpp": {
       "before": null,
-      "after": "b5e8e40277fb6f7fec04802b5b05cca3c31d16f492daae9ebf0019925023c32b"
+      "after": "f3a8a201768a38f7f035f88d784bfa0a447600514a283b8e2d27f0e552e2128f"
     },
     "gpu/shim/bbport_guest_memory.h": {
       "before": null,
-      "after": "d4ffc3a13cbdbfa85b412550bca748b97bc20fb31513a8ccd018a7564833e82e"
+      "after": "4240c6e1cfa5aeb65e3b1e606fc3e6585646152c3d2c2b7518dff3d42219e81c"
     },
     "gpu/shim/bbport_guest_memory_win.cpp": {
       "before": null,
-      "after": "0a548d875a36053a94edceaf17cbbb0795cbdf94452dc1325f39f15a60091c4b"
+      "after": "e507ca538dbea24cbd6924240e9696a9f59605a116e73cb3705ff6f1d4580c2e"
     },
     "gpu/shim/bbport_heap_sites.cpp": {
       "before": null,
@@ -2533,7 +2541,7 @@
     },
     "gpu/shim/bbport_menu_i18n.cpp": {
       "before": null,
-      "after": "cd82ceee0833be52c996c5e0a6a9b8770467490f15ce3722d2d4c4a1d251fee4"
+      "after": "448edecde5597d5d30fe996c8a0050959a52dcc6c8bc74bb8e3095f4e34bc2b8"
     },
     "gpu/shim/bbport_menu_i18n.h": {
       "before": null,
@@ -2625,7 +2633,7 @@
     },
     "gpu/shim/common/assert.cpp": {
       "before": null,
-      "after": "b511cfa110daf576945d0860842a49a447ccd13b10c5d8a547eb1cf79c50460b"
+      "after": "75b90e3c59505b5062420e107113f7bbffae9daa907da47dce7f46087b80d6f2"
     },
     "gpu/shim/common/debug.h": {
       "before": null,
@@ -2769,7 +2777,7 @@
     },
     "gpu/shim/engine/loading.cpp": {
       "before": null,
-      "after": "4c2b2dab2bec4ef330ab5d72a805663a850d8240b276e36e7eb10369c04d5602"
+      "after": "5f52edeadca28f585be3c591bb259f7c837a96499a3e2b14e4efc4df356f440c"
     },
     "gpu/shim/engine/loading.h": {
       "before": null,
@@ -2797,7 +2805,7 @@
     },
     "gpu/shim/engine/option_menu.cpp": {
       "before": null,
-      "after": "e91d8e268f7f13174e6cf16d5fbacdb637766525a18e5a7076ebd4e538086716"
+      "after": "8fc553b5955a93dae74902f3cc9df4b26993c6a4dc4cd90f34d54bddc0083848"
     },
     "gpu/shim/engine/option_menu.h": {
       "before": null,
@@ -2925,11 +2933,11 @@
     },
     "gpu/shim/lantern_pacing.cpp": {
       "before": null,
-      "after": "4107164f409b295820380eb9c6228ad7d898b3c4883f00c3b196bfdb01f6c71a"
+      "after": "c73fc49b7d5d89862ca724619a5cb0a40ae5b3ccb0add88b4a72c84184135b21"
     },
     "gpu/shim/lantern_pacing.h": {
       "before": null,
-      "after": "1d26f16ed54f87b210fbe5ff56d5f6bd7a5524e504161968c5bffc1072e6e5a7"
+      "after": "4274bedee40a92cab00382ef2b54a77a380c75ea4199ccd39cf46920ac837c7f"
     },
     "gpu/shim/sdl_window.h": {
       "before": null,
@@ -2945,7 +2953,7 @@
     },
     "gpu/shim/window.cpp": {
       "before": null,
-      "after": "71a528d0eca0a83a251c268c3386288efcb2ce7f9b29e4c17049d62fc911b5b6"
+      "after": "ff13149d6ea23a8f79f450cca5ad673821346e52e4e82ec796eddea39336a26c"
     },
     "gpu/third_party/fonts/DejaVuSans.ttf": {
       "before": null,
@@ -2961,15 +2969,15 @@
     },
     "gpu/third_party/fonts/LanternMenuSC-README.md": {
       "before": null,
-      "after": "9dfb1be0747b0458911562a4da68b839a54060732cb00d9306dc953acacbc5eb"
+      "after": "0bc6f7a33ce076c3e6966da2baee53d13025939d19b940353f5be480fd81ec87"
     },
     "gpu/third_party/fonts/LanternMenuSC-glyphs.txt": {
       "before": null,
-      "after": "f287fe637302f95af37ba620fe88828b3bd401d0409063d35d57c0e3384c257e"
+      "after": "656d0a0f1fcf123a7ced0dff98f1f9831e883b6f67f687695593d4a9db7693cf"
     },
     "gpu/third_party/fonts/LanternMenuSC.ttf": {
       "before": null,
-      "after": "46daaf7dc7637268a7bdbac8f56ee078bd99d52272e2ec4a17c36faa6d9ec85a"
+      "after": "1b6cf64733ff5832d7f3593681622f33db47f19fbafd331c13ff29b2e1320a87"
     },
     "gpu/third_party/fsr-vulkan/.github/workflows/ci.yml": {
       "before": null,
@@ -8133,11 +8141,11 @@
     },
     "run.sh": {
       "before": null,
-      "after": "cb54bbd8362cbda048387cda804a645a230c871037ce7d6fe87f9336f51cbf51"
+      "after": "495d1ec687c19e30d06066f89e7dfdf43d0652bd285ac7c00db558f42e37402f"
     },
     "scripts/__pycache__/engine_assets.cpython-312.pyc": {
       "before": null,
-      "after": "6a49e78350090c7ba07dd82ee4a9b79c6a0df17bfc558dd6dc7cc11689ef02aa"
+      "after": "5469639d6be491878f0321815e96eaac970fabce76bd87311521731c57ed070f"
     },
     "scripts/content_profile.py": {
       "before": null,
@@ -8145,7 +8153,11 @@
     },
     "scripts/engine_assets.py": {
       "before": null,
-      "after": "3e7d55ce529d7e26b019823f123dedb0fc64697731d046fa1782f83dd86de013"
+      "after": "c21c963cb497d17fe7cb993bf114c07f5ebd37c2de5b1597b64aa9d80d242166"
+    },
+    "scripts/engine_features.py": {
+      "before": null,
+      "after": "95fc91ab685d8ca6bcac8c4095d9c031141f8a85611bc449e1f6ac539c597a11"
     },
     "scripts/game_check.py": {
       "before": null,
@@ -8153,7 +8165,7 @@
     },
     "scripts/gpu_cache.py": {
       "before": null,
-      "after": "8735845083358c0caa29fa1acaa067697a9ba50a682e575d99585a49b9640f0e"
+      "after": "7a267bdf9ac447fc8926ee22a8e76ce5a81160dc3bcda66d4b6f903d95b70a2e"
     },
     "scripts/hud_layout.py": {
       "before": null,
@@ -8185,7 +8197,7 @@
     },
     "scripts/patches.py": {
       "before": null,
-      "after": "9ec73eb1e8da7782853949a2062bc7f4bb4ed810f581d369c81f9d7c4a1a1bac"
+      "after": "6270b88c6634ed421222cf2fc2d59c75c54de9382c4ad65ccf3baf002f42313e"
     },
     "scripts/pc_localization.py": {
       "before": null,
@@ -8257,7 +8269,7 @@
     },
     "src/runtime_file.c": {
       "before": null,
-      "after": "c93783b7ebcc7519be0267d4c89b2d82e200953e9dd22461d712592cc1008349"
+      "after": "22b356e81417ba511ad557b27203cbc050652b2c1362df74fb7ad1a733380a6a"
     },
     "src/runtime_host.c": {
       "before": null,
@@ -8269,7 +8281,7 @@
     },
     "src/runtime_memory.c": {
       "before": null,
-      "after": "19d5c02500f887424462268fc093577ca3a2f8f3c4b7bcf16d7b6a2ca5d7f81d"
+      "after": "f7996d5aa721bc211301dda03cae317b9177fb64a3b9a1b52b538a8047b35f26"
     },
     "src/runtime_mutex.c": {
       "before": null,
@@ -8329,23 +8341,23 @@
     },
     "src/win32_memory.c": {
       "before": null,
-      "after": "2fb13b714c0c1864b1b92e93b4a9308313b156e88d96d655f14969ab8d494ac5"
+      "after": "0d4442806c24d8b7facfd8b284ec8391de58fec7f89953a3326d2d178de10054"
     },
     "src/win32_memory.h": {
       "before": null,
-      "after": "ca2f479f22a467d99c48c661745a46254daf452f780016d251b7c4efc86345ae"
+      "after": "eefbb1e5d1133cd4be30dac2f0051e7094c93abb60aa385c9a8d1577caa2b7d1"
     },
     "start/assets.cpp": {
       "before": null,
-      "after": "e846375181972e1bf6e9843b9beb60b5bd74fc0337dfbce29e2337056fe6a58c"
+      "after": "579a392a13bbf7aa65715fe5c221d6d35c763059a1d6f6db2b38d00ecc1816bd"
     },
     "start/assets.h": {
       "before": null,
-      "after": "a22ac8d9259c8758b9cde1302e0bd25aace9ba6c96b0aea99f1d191410f80599"
+      "after": "08c14feea8474e85b4dada9f34bc34d80c4dbbf8892736cec9f7682f0e929e0a"
     },
     "start/common.cpp": {
       "before": null,
-      "after": "cd8a77f602b71cbd15ba724a482aae89c2e13adcff4f1e78a2940e23799f484a"
+      "after": "19e95d8201b92ed1f8979678e1128627bce05a7ef765340f0f09ba99cdf5e3bf"
     },
     "start/common.h": {
       "before": null,
@@ -8365,7 +8377,7 @@
     },
     "start/main.cpp": {
       "before": null,
-      "after": "5fb824b833be9093757882a364cfaaff5984e3cf0d04152b0a9ba6cf64cf1740"
+      "after": "72e171623a1cad5dac5006a39bb94f417ff2ddeb7ea00f5948cb8a8d6d6d4ab5"
     },
     "start/mods.cpp": {
       "before": null,
@@ -8385,7 +8397,7 @@
     },
     "start/patches.cpp": {
       "before": null,
-      "after": "2399b9bb08c4433659bd5c5fc1fdbf9053d4ecc9b3af75ac7728a4051427f570"
+      "after": "078f98154aed3e004c7fbb4ed206ba51b2d59d25b8469890396c17d9863569c6"
     },
     "start/patches.h": {
       "before": null,
@@ -8421,7 +8433,7 @@
     },
     "tests/shader_lab.cpp": {
       "before": null,
-      "after": "397598e9f317cda3d98f9a7e028eb361a7086d81e1899987b3f5b2f2eb2c6b3f"
+      "after": "5c649d5cffb992042cbe4d895b40946acb87bd51aad51c0680a2284e31bf021d"
     },
     "tests/test_camera_motion.cpp": {
       "before": null,
@@ -8437,7 +8449,7 @@
     },
     "tests/test_engine_assets.py": {
       "before": null,
-      "after": "74472c6d25a7fd33536f4e44692d433c05d9036d73442ad30c60f898dff6e362"
+      "after": "9066614b6436873adfa4f99668fd4df70b19c63319860390e03ebc4945370948"
     },
     "tests/test_engine_hooks.cpp": {
       "before": null,
@@ -8461,11 +8473,11 @@
     },
     "tests/test_gpu_cache.py": {
       "before": null,
-      "after": "53a9f0c2ee503f38003ae015b098d185792538a4cebecdb5937ee2b0024c3c3a"
+      "after": "57bd5977553f73dbcce76917fa42d28057a10a4d41f2cb487bdb27bf1d3091bd"
     },
     "tests/test_gpu_runtime_stubs.cpp": {
       "before": null,
-      "after": "4bb53dddb164d0c8574bca8cffefab3d0071cd2efabc7a4c16fccedac5d952c2"
+      "after": "429716f0855fcecf209052cc6711829b80ae1d5331c1c17a2f8167594670b9a5"
     },
     "tests/test_hdr_native.cpp": {
       "before": null,
@@ -8475,9 +8487,17 @@
       "before": null,
       "after": "b5dd8c76295e127dea9c218ee7c3c689a98fc074234838ddcd742bde97a98fb8"
     },
+    "tests/test_indirect_clamp.cpp": {
+      "before": null,
+      "after": "846db8925acafa9ab5710f46125d939d230cfd973e114c661d7405e5ca93fb46"
+    },
     "tests/test_link_libc.py": {
       "before": null,
       "after": "bd8bdf200d46abfba85349cefdcf05c9361df9c4427c31b737a38de0a86b29bc"
+    },
+    "tests/test_menu_asset_localization.cpp": {
+      "before": null,
+      "after": "863788903e6d1fdcedb1a1f236c8d028dfbcd726e30dd9911faa16e96d5ae7f5"
     },
     "tests/test_mods.py": {
       "before": null,
@@ -8509,7 +8529,7 @@
     },
     "tests/test_patches.py": {
       "before": null,
-      "after": "db7747e5b53f50b50290a6f21c6e5407a56dd7a03287988ff0ad91ab7281ad6f"
+      "after": "107be1a008e4c7ffba00fa202369e7be160f1a550d7469b5b69f2e14018776e7"
     },
     "tests/test_pc_input.cpp": {
       "before": null,
@@ -8545,7 +8565,7 @@
     },
     "tests/test_run_settings.py": {
       "before": null,
-      "after": "4517bebaa2c5e7ffc0cee3973b2241081bdfc154b85d182424f81371c8d97954"
+      "after": "98b566f0d0a041ec922e991b87e993f78e6f7d739a1855843935f15bf5de1ac2"
     },
     "tests/test_runtime.c": {
       "before": null,
@@ -8739,6 +8759,10 @@
       "before": null,
       "after": "228994d11e06ba2a9f2e54b1d82b49d25ef404071008bf72f4a2c91c8933e242"
     },
+    "third_party/LibAtrac9/CSharp/LibAtrac9.sln": {
+      "before": null,
+      "after": "05c535440aaf84e3714c5ebd1f9720939856a03619f98a64f77129b5ccd84ec8"
+    },
     "third_party/LibAtrac9/CSharp/LibAtrac9/Atrac9Config.cs": {
       "before": null,
       "after": "0fcb37a41beb401a942273b55652dc23f58772dec6cbf5928748ac2d824af1c6"
@@ -8823,10 +8847,6 @@
       "before": null,
       "after": "8b94099de95f3178bb683ec3ff72fe3bede16f54d1e40514b46e9af2b0f577d4"
     },
-    "third_party/LibAtrac9/CSharp/LibAtrac9.sln": {
-      "before": null,
-      "after": "05c535440aaf84e3714c5ebd1f9720939856a03619f98a64f77129b5ccd84ec8"
-    },
     "third_party/LibAtrac9/LICENSE": {
       "before": null,
       "after": "cdb280ff931233bdefef0dfdd1d884217d97cb24a96530a41ce7848790df86f7"
@@ -8847,6 +8867,10 @@
       "before": null,
       "after": "03c50e8a16bd6cd135e2c5202152239cd80e23e25f389eaab44e29b267b98200"
     },
+    "tools/chunk_buffer_probe.cpp": {
+      "before": null,
+      "after": "12f876282823d3723707c5c4aa07f27c46ef99195bec0dbb34aacaea851bff8c"
+    },
     "tools/dump_view.py": {
       "before": null,
       "after": "0d5cf14ad9852d58886a6476395c2031484df54fe65a64969c05372ff64e2967"
@@ -8861,11 +8885,11 @@
     },
     "tools/engine/menu_assets.cpp": {
       "before": null,
-      "after": "6e2f14dec43f7a30641664ba5aa15731e3a2693b07c675c9bbe1f600cafdde42"
+      "after": "bf4b0981517c6819b829f0f07fba9c2594361e0fbf0d2a9568b8548dfbfdd026"
     },
     "tools/engine/pc_option_messages.tsv": {
       "before": null,
-      "after": "627ec94c50d6f00ca212516e99fb8652097a168ba1381157ec3eb7781c8ea2ad"
+      "after": "db4bcca6ab7ced61ba1431488941a4d7c942965afb40cb380c1a61dbae685449"
     },
     "tools/engine/rebirth_script.cpp": {
       "before": null,
@@ -9106,10 +9130,6 @@
     "tools/visual.sh": {
       "before": null,
       "after": "1a0372397de8934c33b40c483d14a074d90c97e3ad14bf37d42e23d953afd576"
-    },
-    "UPSTREAM-beta8.md": {
-      "before": null,
-      "after": "dde5a47cd0cc07f39c83f9c864323f363605f3cbc626f09464270c5418b54ad7"
     }
   }
 }

@@ -1,6 +1,6 @@
 namespace BloodborneLauncher.Core;
 
-/// <summary>Phrase recognition for the easter egg; the page persists access without enabling any cheat.</summary>
+/// <summary>Phrase recognition for the easter egg; the launcher persists access without enabling any cheat.</summary>
 internal sealed class CheatAccess
 {
     internal static CheatAccess Session { get; } = new();
@@ -13,8 +13,9 @@ internal sealed class CheatAccess
         if (Unlocked) _prefix = "";
     }
     internal void ResetInput() => _prefix = "";
-    internal bool Feed(string text)
+    internal bool Feed(string text, bool allowed = true)
     {
+        if (!allowed) { ResetInput(); return false; }
         string phrase = Unlocked ? LockPhrase : UnlockPhrase;
         foreach (char value in text)
         {

@@ -33,6 +33,8 @@ namespace BloodborneLauncher
             ws.GameStateChanged += UpdatePlayButton;
             ws.GameCrashed += OnGameCrashed;
             using (LauncherDiagnostics.Measure("Workspace initialization")) ws.Initialise();
+            CheatAccess.Session.Restore(ws.Settings.Bool("cheats_unlocked"));
+            CheatInputRouter.Register();
             MenuSounds.Attach(this);
             UpdateAudioToggle();
 
@@ -225,7 +227,7 @@ namespace BloodborneLauncher
             UpdateAudioToggle();_pages.Clear();NavigatePage(current);
             SelectSidebar(current==typeof(MenuHomePage)?"home":current==typeof(PlayPage)?"play":
                 current==typeof(GraphicsPage)?"graphics":
-                current==typeof(ControlsPage)?"controls":current==typeof(CheatsPage)?"cheats":
+                current==typeof(ControlsPage)?"controls":current==typeof(TweaksPage)?"tweaks":current==typeof(CheatsPage)?"cheats":
                 current==typeof(OnlinePage)?"online":current==typeof(TrophiesPage)?"trophies":current==typeof(MorePage)?"mods":"advanced");
         }
 
@@ -269,7 +271,8 @@ namespace BloodborneLauncher
         {
             using (LauncherDiagnostics.Measure("Native font and theme")) LauncherAppearance.ApplyBloodborne();
             using (LauncherDiagnostics.Measure("Native image installation")) MenuAssets.Install();
-            // Keep the compiled app.ico; extracted artwork belongs only to the launched game.
+            // Auto keeps compiled app.ico; a chosen launcher picture never replaces the game icon.
+            AppIcon.Apply(this, Workspace.Current.Settings.Str("app_icon"));
             FontFamily = LauncherAppearance.MenuFont;
             BackdropImage.Source = MenuAssets.Background;
             StateChanged += (_, _) => {
@@ -356,14 +359,34 @@ namespace BloodborneLauncher
             });
         }
 
+        internal bool IsCapturingCheatInput => PageFrame.Content is ControlsPage { IsCapturingInput: true };
+
+        /// <summary>Persist the easter egg and refresh navigation without recreating the current page.</summary>
+        internal void ApplyCheatAccess()
+        {
+            bool unlocked=CheatAccess.Session.Unlocked;
+            var ws=Workspace.Current;
+            ws.Settings.Set("cheats_unlocked",unlocked);
+            if(!unlocked)
+                CheatLaunchNotice.DisableAll((key,value)=>ws.Ini.Set(key,value),ws.Ini.Values.Select(pair=>pair.Key).ToArray());
+            ws.SaveNow();
+            string selected=_navigation.FirstOrDefault(pair=>Equals(pair.Value.Tag,"active")).Key??"home";
+            bool leaveCheats=!unlocked && (PageFrame.Content is CheatsPage || selected=="cheats");
+            if(leaveCheats)selected="tweaks";
+            _navigation.Clear();SidebarItems.Children.Clear();SidebarItems.RowDefinitions.Clear();
+            BuildSidebar();ScaleSidebar();SelectSidebar(selected);
+            if(leaveCheats)NavigatePage(typeof(TweaksPage));
+        }
+
         private readonly Dictionary<string, System.Windows.Controls.Button> _navigation = new();
         private void BuildSidebar()
         {
             foreach (var (key,label) in new[] {
                 ("home","Start"),("play","Game"),("graphics","Graphics"),
-                ("controls","Controls"),("cheats","Tweaks"),("online","Online"),
+                ("controls","Controls"),("tweaks","Tweaks"),("cheats","Cheats"),("online","Online"),
                 ("trophies","Achievements"),("advanced","Settings"),("mods","More") })
             {
+                if (key == "cheats" && !CheatAccess.Session.Unlocked) continue;
                 var button=new System.Windows.Controls.Button { Content=BloodborneLauncher.Core.UiText.T(PcText.Get(label)),MinHeight=48,
                     VerticalAlignment=VerticalAlignment.Stretch,HorizontalContentAlignment=HorizontalAlignment.Center };
                 if(key=="home"){button.FontSize=48;button.FontWeight=FontWeights.Bold;button.MinHeight=78;}
@@ -382,7 +405,7 @@ namespace BloodborneLauncher
             double scale=TabMetrics.SidebarScale(ActualWidth,ActualHeight);
             SidebarColumn.Width=new GridLength(244*scale);
             SidebarHost.Padding=new Thickness(0,26*scale,0,26*scale);
-            SidebarItems.MinHeight=480*scale;
+            SidebarItems.MinHeight=Math.Max(480,78+(_navigation.Count-1)*48)*scale;
             foreach(var pair in _navigation)
             {
                 bool home=pair.Key=="home";
@@ -415,6 +438,7 @@ namespace BloodborneLauncher
         private async void NavigatePage(Type type)
         {
             if(_closed)return;
+            if(type == typeof(CheatsPage) && !CheatAccess.Session.Unlocked) type=typeof(TweaksPage);
             _navigationInProgress=true;_navigationMemory.Suspend();
             long request=++_navigationRequest;
             _navigationCancel?.Cancel();_navigationCancel?.Dispose();
@@ -449,10 +473,11 @@ namespace BloodborneLauncher
         /// <summary>Preserve links from existing setting pages and diagnostics.</summary>
         public void Show(string page)
         {
+            if (page == "cheats" && !CheatAccess.Session.Unlocked) page = "tweaks";
             var type = page switch {
                 "controls" => typeof(ControlsPage), "graphics" => typeof(GraphicsPage),
                 "display" => typeof(GraphicsPage), "trophies" => typeof(TrophiesPage),
-                "online" => typeof(OnlinePage), "cheats" => typeof(CheatsPage),
+                "online" => typeof(OnlinePage), "tweaks" => typeof(TweaksPage), "cheats" => typeof(CheatsPage),
                 "advanced" => typeof(SettingsPage), "mods" or "output" => typeof(MorePage),
                 _ => typeof(PlayPage),
             };

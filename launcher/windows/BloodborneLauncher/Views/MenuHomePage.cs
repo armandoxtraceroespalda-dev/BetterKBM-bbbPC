@@ -70,7 +70,7 @@ public sealed class MenuHomePage : LauncherPage
     private void ScaleInformation()
     {
         var window = Window.GetWindow(this);
-        double scale = TabMetrics.SidebarScale(window?.ActualWidth ?? 1280, window?.ActualHeight ?? 800);
+        double scale = WindowTextScale.For(window?.ActualWidth ?? 1280, window?.ActualHeight ?? 800);
         if (Math.Abs(scale - _infoScale) < 0.005) return;
         _infoScale = scale;
         foreach (var label in _statLabels) label.FontSize = 11.375 * scale;

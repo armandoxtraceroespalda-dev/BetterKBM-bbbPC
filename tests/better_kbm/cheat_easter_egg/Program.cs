@@ -4,7 +4,7 @@ static void Check(bool value, string text) { if (!value) throw new Exception(tex
 var access = new CheatAccess();
 Check(!access.Unlocked && !access.Feed("git"), "The section starts locked and partial input is insufficient.");
 access.ResetInput();
-Check(!access.Feed("gud"), "Typing on another page cannot finish a previous prefix.");
+Check(!access.Feed("gud"), "An explicit reset prevents an interrupted prefix from completing.");
 Check(access.Feed("xxGITGUD") && access.Unlocked, "The exact phrase is case insensitive and tolerates earlier unrelated input.");
 Check(!access.Feed("gitgud"), "An unlocked section does not repeatedly reopen.");
 var restored = new CheatAccess();
@@ -17,6 +17,15 @@ Check(!locked.Unlocked, "New users with no saved unlock still start locked.");
 
 Check(access.Feed("IGOTGUD") && !access.Unlocked, "The lock phrase hides the section again.");
 Check(access.Feed("gitgud") && access.Unlocked, "The unlock phrase works again after locking.");
+var global = new CheatAccess();
+Check(!global.Feed("git") && global.Feed("gud") && global.Unlocked,
+    "The global session can complete its phrase across navigation without a page reset.");
+Check(!global.Feed("igo") && !global.Feed("password text", allowed:false) && !global.Feed("tgud") && global.Unlocked,
+    "Text fields are excluded and cannot bridge a partial lock phrase.");
+Check(global.Feed("igotgud") && !global.Unlocked, "A full phrase still locks after ignored text input.");
+Check(!global.Feed("git") && !global.Feed("gitgud",allowed:false) && !global.Feed("gud") && !global.Unlocked,
+    "Typing the unlock phrase in an editor never unlocks or carries a prefix out of the editor.");
+Check(global.Feed("gitgud") && global.Unlocked,"Unlock remains reusable after excluded input.");
 var resetValues = new Dictionary<string,string> {
     ["cheat_stamina"]="1", ["cheat_vials"]="infinite", ["cheat_bullets"]="50",
     ["cheat_gun_range"]="300", ["cheat_echo_multiplier"]="10", ["cheat_future"]="1",

@@ -130,6 +130,9 @@ namespace BloodborneLauncher.Core
             OnUnless0("BB_OPTISCALER_COMPAT", Fixes, UiText.T("OptiScaler compatibility"),
                 UiText.T("Only when OptiScaler is installed: DLSS calls wait for the GPU queue, and one thread sends the GPU work while its frame generation is on, ") +
                 UiText.T("so OptiScaler's hooks don't crash. Costs a little FPS with its frame generation. Off: the engine runs as without OptiScaler")),
+            OnUnless0("BB_EFFECT_FIXES", Fixes, UiText.T("Ebrietas effect fix"),
+                UiText.T("Replaces Ebrietas' trail effect with the one Nexus mod 41 uses, made from your own game files: her rock attacks no longer pile up thousands of rocks ") +
+                UiText.T("(FPS falling from 90 to 40, crashes before beta 8). Off: the game's own effect. A mod that changes these effect files wins")),
             Flag("BB_RED_ZONE_FUNCTIONS", Fixes, UiText.T("Intel effect crash fix (test)"),
                 UiText.T("For crashes in effects on Intel 12th-14th gen CPUs (Ebrietas, Witch of Hemwick, One Reborn, the Cainhurst " +
                     "cutscene): the two effect ribbon writers keep their data where Windows can't overwrite it. Every effect stays " +

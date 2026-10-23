@@ -126,10 +126,10 @@ struct Captions {
 
 // The repository's own text for a message id: the caption object's +0x00,
 // which the repository owns and which outlives anything the port holds.
-const char16_t* message_text(std::uint32_t id) {
+const char16_t* message_text(std::uint32_t id, bool help = false) {
     Captions c(id);
     const char16_t* t = nullptr;
-    std::memcpy(&t, &c.buf[0], sizeof(t));
+    std::memcpy(&t, &c.buf[help ? 0x40 : 0], sizeof(t));
     return t;
 }
 
@@ -291,11 +291,21 @@ std::atomic<bool> g_keys_save{false};
 
 // Detect the game-selected message bundle, not the launcher's language.
 PcLanguage::Language g_keys_language=PcLanguage::Language::English;
+bool g_keys_chinese=false;
 const char* localized(const char* source){return PcLanguage::Translate(source,g_keys_language);}
 template <std::size_t N>
 void to_utf16(char16_t (&out)[N],const char* s) {
  auto wide=PcPrompts::wide(localized(s?s:""));
  const auto n=std::min(wide.size(),N-1);std::copy_n(wide.data(),n,out);out[n]=0;
+}
+
+// The custom catalog covers the existing eight locales; use the new game-bundle
+// messages for Simplified Chinese, with the same action IDs and category order.
+template <std::size_t N>
+void key_message(char16_t (&out)[N], std::uint32_t id, const char* fallback, bool help=false) {
+    const char16_t* text=g_keys_chinese ? message_text(id,help) : nullptr;
+    if(text && *text){std::size_t i=0;for(;text[i] && i+1<N;++i)out[i]=text[i];out[i]=0;}
+    else to_utf16(out,fallback);
 }
 
 // The page names, as the tabs read. Plain ASCII: the line help and values
@@ -314,7 +324,7 @@ int keys_action(int row) { return BindingPages::Action(g_keys.page,row-1); }
 bool keys_row_bound(int row) { return row >= 1 && row < kKeysRows && keys_action(row)>=0 && keys_action(row) < keys_listed(); }
 
 void keys_fill_value(int row) {
-    if(row==0){to_utf16(g_keys_text[row],kKeyPageNames[g_keys.page]);return;}
+    if(row==0){key_message(g_keys_text[row],119200+g_keys.page,kKeyPageNames[g_keys.page]);return;}
     if (!keys_row_bound(row)) {
         g_keys_text[row][0] = 0;
         return;
@@ -324,16 +334,18 @@ void keys_fill_value(int row) {
     else {
       std::snprintf(d,sizeof d,"%s",NativePages::ControllerBindingLabel(keys_action(row)).c_str());
     }
-    to_utf16(g_keys_text[row], d);
+    if(std::strcmp(d,"Unbound")==0)key_message(g_keys_text[row],119214,d);
+    else to_utf16(g_keys_text[row], d);
 }
 
 void keys_fill(int page) {
     const auto* title=message_text(119020);
     g_keys_language=PcLanguage::Detect(title);
+    g_keys_chinese=title && std::u16string_view(title)==u"按键绑定";
     g_keys.page = (page % CategoryCount + CategoryCount) % CategoryCount;
     g_keys_page = g_keys.page;
-    to_utf16(g_keys_label[0], "Category");
-    to_utf16(g_keys_help[0], "Left and right change the group of actions shown.");
+    key_message(g_keys_label[0],119000,"Category");
+    key_message(g_keys_help[0],119000,"Left and right change the group of actions shown.",true);
     keys_fill_value(0);
     for (int r = 1; r < kKeysRows; ++r) {
         if (!keys_row_bound(r)) {
@@ -341,8 +353,8 @@ void keys_fill(int page) {
             continue;
         }
         const BindingInfo& b = host_binding_info(keys_action(r));
-        to_utf16(g_keys_label[r], b.label);
-        to_utf16(g_keys_help[r], b.help);
+        key_message(g_keys_label[r],119100+keys_action(r),b.label);
+        key_message(g_keys_help[r],119100+keys_action(r),b.help,true);
         keys_fill_value(r);
     }
 }
@@ -427,7 +439,7 @@ void keys_update(int row, bool focused) {
         } else if (keys_row_bound(row) && !BbSettings::Get().keyboard_mouse && (edge & decide)) {
             NativePages::BeginControllerCapture(keys_action(row));
         } else if (keys_row_bound(row) && BbSettings::Get().keyboard_mouse && (edge & decide)) {
-            to_utf16(g_keys_text[row], "Hold keys/clicks...");
+            key_message(g_keys_text[row],119213,"Hold keys/clicks...");
             redraw(g_keys.widget[row] + kChoiceList);
             host_bind_capture_begin(keys_action(row));
 

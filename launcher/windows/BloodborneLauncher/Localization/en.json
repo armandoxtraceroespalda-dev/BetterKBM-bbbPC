@@ -1697,5 +1697,14 @@
   "Add input": "Add input",
   "The next input is added to this action without replacing its current bindings.": "The next input is added to this action without replacing its current bindings.",
   "Keyboard/Mouse": "Keyboard/Mouse",
-  "Keep the last direction briefly while sprint is held. Default: 0 ms. Zero stops immediately.": "Keep the last direction briefly while sprint is held. Default: 0 ms. Zero stops immediately."
+  "Keep the last direction briefly while sprint is held. Default: 0 ms. Zero stops immediately.": "Keep the last direction briefly while sprint is held. Default: 0 ms. Zero stops immediately.",
+  "Launcher icon": "Launcher icon",
+  "The launcher window's icon. The game keeps its extracted Bloodborne icon.": "The launcher window's icon. The game keeps its extracted Bloodborne icon.",
+  "None chosen yet: the build's own icon shows": "None chosen yet: the build's own icon shows",
+  "DLSS options": "DLSS options",
+  "Native AA": "Native AA",
+  "Quality": "Quality",
+  "Balanced": "Balanced",
+  "Ultra Performance": "Ultra Performance",
+  "Custom": "Custom"
 }

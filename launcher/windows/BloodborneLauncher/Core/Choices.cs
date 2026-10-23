@@ -19,7 +19,7 @@ namespace BloodborneLauncher.Core
             new("FSR 4", "fsr4"),
             new("FSR 4.1.1", "fsr411"),
             new("FSR 3", "fsr3"),
-            new("DLSS (NVIDIA RTX)", "dlss"),
+            new("DLSS", "dlss"),
             new("TAA (native anti-aliasing)", "taa"),
             new("Off", "off"),
         };
@@ -59,7 +59,7 @@ namespace BloodborneLauncher.Core
             new(UiText.T("Balanced (x1.7)"), "2"),
             new(UiText.T("Performance (x2)"), "3"),
             new(UiText.T("Ultra Performance (x3)"), "4"),
-            new(UiText.T("Custom (render scale below)"), "5"),
+            new(UiText.T("Custom"), "5"),
         };
 
         public static readonly Choice[] OutputResolutions =
@@ -155,12 +155,12 @@ namespace BloodborneLauncher.Core
         public static readonly Choice[] DlssModels =
         {
             new(UiText.T("Auto (per quality)"), "auto", UiText.T("NVIDIA's DLSS 4.5 pairing: K for DLAA, Quality and Balanced, M for Performance, L for Ultra Performance")),
-            new("Transformer (preset K)", "k", UiText.T("The newer model: steadier thin and moving objects (a weapon on the back, railings)")),
-            new("Transformer 2 (preset M)", "m", UiText.T("DLSS 4.5's model for Performance: sharper, a little heavier")),
-            new("Transformer 2 (preset L)", "l", UiText.T("DLSS 4.5's model for Ultra Performance")),
-            new("Transformer (preset J)", "j", UiText.T("Like K, slightly less ghosting and a little more flicker")),
-            new("CNN (preset E)", "e", UiText.T("The older model: a little faster on RTX 20 and 30 cards, softer and more ghosting in motion")),
-            new("CNN (preset F)", "f", UiText.T("The older model for Ultra Performance and DLAA")),
+            new(UiText.T("Transformer (preset K)"), "k", UiText.T("The newer model: steadier thin and moving objects (a weapon on the back, railings)")),
+            new(UiText.T("Transformer 2 (preset M)"), "m", UiText.T("DLSS 4.5's model for Performance: sharper, a little heavier")),
+            new(UiText.T("Transformer 2 (preset L)"), "l", UiText.T("DLSS 4.5's model for Ultra Performance")),
+            new(UiText.T("Transformer (preset J)"), "j", UiText.T("Like K, slightly less ghosting and a little more flicker")),
+            new(UiText.T("CNN (preset E)"), "e", UiText.T("The older model: a little faster on RTX 20 and 30 cards, softer and more ghosting in motion")),
+            new(UiText.T("CNN (preset F)"), "f", UiText.T("The older model for Ultra Performance and DLAA")),
             new(UiText.T("The DLL's default"), "default", UiText.T("Whatever the included DLSS version picks for each quality mode")),
         };
 

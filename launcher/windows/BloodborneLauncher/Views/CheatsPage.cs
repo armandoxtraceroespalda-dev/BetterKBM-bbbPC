@@ -1,8 +1,6 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
-using System.Windows.Input;
 using BloodborneLauncher.Core;
 using BloodborneLauncher.Controls;
 
@@ -26,67 +24,9 @@ namespace BloodborneLauncher.Views
             { "bbhost-0.4.0-fps1", "bbhost-0.4.0-fps2", "bbhost-0.4.0-fps3", "bbhost-0.4.0-fps4" };
 
         private readonly InfoBar _engine;
-        private readonly StackPanel _cheatsPanel = new OptionRows();
-        private Window? _inputWindow;
-
-        private void DetachSecretInput()
-        {
-            if (_inputWindow != null) _inputWindow.PreviewTextInput -= SecretInput;
-            _inputWindow = null; CheatAccess.Session.ResetInput();
-        }
-        private void SecretInput(object sender, TextCompositionEventArgs e)
-        {
-            if (!IsVisible || !IsKeyboardFocusWithin && Window.GetWindow(this)?.IsActive != true) return;
-            // Never inspect account fields, key capture, search text or other editable controls.
-            if (Keyboard.FocusedElement is TextBoxBase or PasswordBox) { CheatAccess.Session.ResetInput(); return; }
-            if (CheatAccess.Session.Feed(e.Text))
-            {
-                bool unlocked = CheatAccess.Session.Unlocked;
-                S.Set("cheats_unlocked", unlocked);
-                if (!unlocked) CheatLaunchNotice.DisableAll((key, value) => Ini.Set(key, value), Ini.Values.Select(p => p.Key).ToArray());
-                Ws.SaveNow();
-                _cheatsPanel.Visibility = unlocked ? Visibility.Visible : Visibility.Collapsed;
-                // Recreate controls after reset so a later unlock never displays stale checked values.
-                if (!unlocked) Dispatcher.BeginInvoke(new Action(() => MainWindow.Instance?.ReloadPages()));
-                e.Handled = true;
-            }
-        }
-
-        public CheatsPage() : base(BloodborneLauncher.Core.UiText.T("Tweaks"),
+        public CheatsPage() : base(BloodborneLauncher.Core.UiText.T("Cheats"),
             BloodborneLauncher.Core.UiText.T("Set here for the next start. While playing, change them in the in-game menu (Insert or L3 + R3): they apply live. Turning a cheat off puts the game's values back; items you already have stay."))
         {
-            Group(BloodborneLauncher.Core.UiText.T(PcText.Get("Gameplay Tweaks")));
-            IniToggle(SymbolRegular.Person24,BloodborneLauncher.Core.UiText.T(PcText.Get("Hunter's dream mirror opens the appearance editor")),null,"change_appearance");
-            IniToggle(SymbolRegular.ArrowUndo24,BloodborneLauncher.Core.UiText.T(PcText.Get("The Altar of Despair resets level and attributes with the Yharnam Stone")),null,"rebirth");
-            foreach (var effect in Choices.Effects.Where(effect => effect.Key is "skip_intro" or "debug_camera"))
-                IniToggle(effect.Key == "skip_intro" ? SymbolRegular.FastForward24 : SymbolRegular.Camera24,
-                    BloodborneLauncher.Core.UiText.T(effect.Title), BloodborneLauncher.Core.UiText.T(effect.Hint), effect.Key);
-            Group("").Visibility = Visibility.Collapsed;
-            var cameraOptions = new OptionRows();
-            void UpdateCameraOptions()
-            {
-                cameraOptions.IsEnabled = Ini.Flag("camera_controls");
-                cameraOptions.Opacity = cameraOptions.IsEnabled ? 1 : 0.45;
-            }
-            IniToggle(SymbolRegular.Camera24, BloodborneLauncher.Core.UiText.T("Camera tuning"), BloodborneLauncher.Core.UiText.T("Turns the three settings below on"), "camera_controls", changed: UpdateCameraOptions);
-            IniSlider(SymbolRegular.ZoomOut24, BloodborneLauncher.Core.UiText.T("Field of view"), 1, 1.5, "camera_fov_scale", cameraOptions);
-            IniSlider(SymbolRegular.ArrowMaximize24, BloodborneLauncher.Core.UiText.T("Distance"), 0.5, 1.5, "camera_distance_scale", cameraOptions);
-            IniSlider(SymbolRegular.ArrowBidirectionalUpDown24, BloodborneLauncher.Core.UiText.T("Height"), 0.5, 1.5, "camera_height_scale", cameraOptions);
-            Body.Children.Add(cameraOptions);
-            UpdateCameraOptions();
-
-            // Engine features from 0.9.4, each with a switch, as IFreemz's "Bloodborne - Experimental".
-            Group(BloodborneLauncher.Core.UiText.T("Cheats"), _cheatsPanel);
-            CheatAccess.Session.Restore(S.Bool("cheats_unlocked"));
-            _cheatsPanel.Visibility = CheatAccess.Session.Unlocked ? Visibility.Visible : Visibility.Collapsed;
-            Body.Children.Add(_cheatsPanel);
-            Loaded += (_, _) =>
-            {
-                DetachSecretInput(); _inputWindow = Window.GetWindow(this);
-                if (_inputWindow != null) _inputWindow.PreviewTextInput += SecretInput;
-            };
-            Unloaded += (_, _) => DetachSecretInput();
-            ReleaseWhenDisposed(DetachSecretInput);
             _engine = new InfoBar
             {
                 IsClosable = false,
@@ -95,13 +35,10 @@ namespace BloodborneLauncher.Views
                 Title = BloodborneLauncher.Core.UiText.T("Not in this engine yet"),
                 Message = BloodborneLauncher.Core.UiText.T("Your engine doesn't apply cheats yet: they arrive with the next engine update. What you pick here is saved and starts working then."),
             };
-            var cheats = new OptionRows();
-            cheats.Children.Add(_engine);
-            _cheatsPanel.Children.Add(new MenuSurface {
-                Child = cheats, Padding = new Thickness(16, 14, 16, 16), Margin = new Thickness(-8, 0, -8, 10)
-            });
+            var cheats = Body;
 
             Group(BloodborneLauncher.Core.UiText.T("Items"), cheats).Margin = new Thickness(0, 0, 0, 8);
+            cheats.Children.Add(_engine);
             Cheat(SymbolRegular.Drop24, "Blood Vials", "cheat_vials", "cheat_vials_amount", cheats);
             Cheat(SymbolRegular.Flash24, "Quicksilver Bullets", "cheat_bullets", "cheat_bullets_amount", cheats);
             IniToggle(SymbolRegular.Beaker24, BloodborneLauncher.Core.UiText.T("Infinite consumables"),
@@ -149,10 +86,6 @@ namespace BloodborneLauncher.Views
             }, "0", into);
             ShowAmount(amount, Mode() == "custom");
         }
-
-        private void IniSlider(SymbolRegular icon, string title, double min, double max, string key, Panel? into = null) =>
-            SliderRow(icon, title, null, min, max, 0.05,
-                () => ParseDouble(Ini.Get(key, "1"), 1), v => Ini.Set(key, Fmt(v)), into: into);
 
         /// <summary>The amount row only shows for Custom amount.</summary>
         private static void ShowAmount(Slider amount, bool show)

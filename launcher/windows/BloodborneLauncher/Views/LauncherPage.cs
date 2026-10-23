@@ -68,6 +68,8 @@ namespace BloodborneLauncher.Views
             _name.Margin = new Thickness(0);
         }
 
+        public void HideName() => _name.Visibility = Visibility.Collapsed;
+
         public SettingRow(SymbolRegular icon, string title, string? info, object? control, bool wide)
         {
             _symbol = icon; _control = control as UIElement; _wide = wide; _info = UiText.T(info);
@@ -306,6 +308,7 @@ namespace BloodborneLauncher.Views
 
             FontSize=18.375;
             if(!settingsShell) { Body=null!;Scroller=null!;return; }
+            PageTypography.Attach(this);
 
             // The tab says which page this is; no page title.
             Body = new StackPanel { Margin = new Thickness(22, 8, 22, 24), MaxWidth = 1600 };

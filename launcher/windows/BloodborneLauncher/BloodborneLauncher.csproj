@@ -9,8 +9,8 @@
     <AssemblyName>Bloodborne Launcher</AssemblyName>
     <RootNamespace>BloodborneLauncher</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.9.37.8</Version>
-    <InformationalVersion>0.9.37-beta8+betterkbm.29</InformationalVersion>
+    <Version>0.9.37.9</Version>
+    <InformationalVersion>0.9.37-beta9+betterkbm.35</InformationalVersion>
     <ApplicationIcon>app.ico</ApplicationIcon>
   </PropertyGroup>
 

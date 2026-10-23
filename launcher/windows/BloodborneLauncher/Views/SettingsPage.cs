@@ -19,6 +19,25 @@ namespace BloodborneLauncher.Views
         private readonly TextBlock _buildHint;
 #endif
         private readonly StackPanel _customRows = new OptionRows();
+        private readonly StackPanel _iconPicture = new OptionRows();
+        private TextBlock _iconPictureHint = null!;
+        private void RefreshIcon()
+        {
+            _iconPicture.Visibility = S.Str("app_icon") == "custom" ? Visibility.Visible : Visibility.Collapsed;
+            SetHint(_iconPictureHint, File.Exists(AppIcon.CustomFile) ? S.Str("app_icon_image") : UiText.T("None chosen yet: the build's own icon shows"));
+            AppIcon.Apply(MainWindow.Instance, S.Str("app_icon"));
+        }
+        private void ChooseIcon()
+        {
+            var dialog = new Microsoft.Win32.OpenFileDialog {
+                Title=UiText.T("Icon picture"),
+                Filter=UiText.T("Pictures|*.png;*.jpg;*.jpeg;*.bmp;*.ico|All files|*.*") };
+            if(dialog.ShowDialog()!=true)return;
+            if(!AppIcon.MakeCustom(dialog.FileName)) {
+                Prompt.Tell(UiText.T("Icon picture"),UiText.F($"{Path.GetFileName(dialog.FileName)} could not be read as a picture."));return;
+            }
+            S.Set("app_icon_image",dialog.FileName);Ws.SaveSoon();RefreshIcon();
+        }
 // Upstream release selection is disabled in this customized launcher.
 #if false // Intentionally disabled; retained as upstream reference.
         private readonly TextBlock _updateHint;
@@ -45,6 +64,14 @@ namespace BloodborneLauncher.Views
                     Refresh();
                 })), out _portHint));
 
+            Group(UiText.T("Appearance"));
+            SettingCombo(SymbolRegular.Image24, UiText.T("Launcher icon"),
+                UiText.T("The launcher window's icon. The game keeps its extracted Bloodborne icon."),
+                AppIcon.Choices,"app_icon",changed:RefreshIcon);
+            Add(Card(SymbolRegular.Image24,UiText.T("Icon picture"),UiText.T("A PNG, JPG, BMP or ICO; square pictures look best"),
+                SmallButton(UiText.T("Choose"),SymbolRegular.FolderOpen24,(_,_)=>ChooseIcon()),out _iconPictureHint),_iconPicture);
+            Body.Children.Add(_iconPicture);RefreshIcon();
+
             Group(BloodborneLauncher.Core.UiText.T("Launch"));
             SettingCombo(SymbolRegular.Rocket24, BloodborneLauncher.Core.UiText.T("Start the game with"), null, Choices.LaunchMethods, "launch_method", changed: () => { ShowMethod(); Ws.SaveSoon(); });
 
@@ -65,7 +92,7 @@ namespace BloodborneLauncher.Views
                 BloodborneLauncher.Core.UiText.T("If the sound jitters or crackles, try DirectSound. The larger buffer is steadier but the sound comes a little later"),
                 Choices.SoundOutput, "sound_output");
 
-            Group(BloodborneLauncher.Core.UiText.T("Diagnostics"));
+            SettingsColumns.SetTwoColumns(Group(BloodborneLauncher.Core.UiText.T("Diagnostics")), true);
             SettingToggle(SymbolRegular.TextBulletListSquare24, BloodborneLauncher.Core.UiText.T("Frame statistics in the log"), "BB_FRAME_STATS", "frame_stats");
             SettingToggle(SymbolRegular.DeveloperBoard24, BloodborneLauncher.Core.UiText.T("FSR 4 profile in the log"), "BB_FSR4_PROFILE", "fsr_profile");
             SettingToggle(SymbolRegular.Speaker224, BloodborneLauncher.Core.UiText.T("Audio statistics in the log"), "BB_AUDIO_STATS", "audio_stats");

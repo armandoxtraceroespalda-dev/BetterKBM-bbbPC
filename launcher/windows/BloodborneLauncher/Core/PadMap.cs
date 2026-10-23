@@ -20,10 +20,10 @@ namespace BloodborneLauncher.Core
             new("dpup", UiText.T("D-pad up")), new("dpdown", UiText.T("D-pad down")), new("dpleft", UiText.T("D-pad left")), new("dpright", UiText.T("D-pad right")),
             new("start", UiText.T("Options / Start")), new("back", UiText.T("Share / Back")), new("touchpad", UiText.T("Touchpad click")),
             new("misc1", UiText.T("Mute / Share (Xbox Series)")),
-            new("paddle1", "Extra button 1 (Edge / Elite paddle, 8BitDo R4 or back button)"),
-            new("paddle2", "Extra button 2 (Edge / Elite paddle, 8BitDo L4 or back button)"),
-            new("paddle3", "Extra button 3 (Elite paddle, 8BitDo back button)"),
-            new("paddle4", "Extra button 4 (Elite paddle, 8BitDo back button)"),
+            new("paddle1", UiText.T("Extra button 1 (Edge / Elite paddle, 8BitDo R4 or back button)")),
+            new("paddle2", UiText.T("Extra button 2 (Edge / Elite paddle, 8BitDo L4 or back button)")),
+            new("paddle3", UiText.T("Extra button 3 (Elite paddle, 8BitDo back button)")),
+            new("paddle4", UiText.T("Extra button 4 (Elite paddle, 8BitDo back button)")),
             new("", UiText.T("Not bound")),
         };
 

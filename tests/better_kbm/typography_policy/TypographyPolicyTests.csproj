@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+ <ItemGroup>
+  <Compile Include="../../../launcher/windows/BloodborneLauncher/Core/WindowTextScale.cs" Link="WindowTextScale.cs" />
+  <Compile Include="../../../launcher/windows/BloodborneLauncher/Core/UpscalerLayout.cs" Link="UpscalerLayout.cs" />
+ </ItemGroup>
+</Project>

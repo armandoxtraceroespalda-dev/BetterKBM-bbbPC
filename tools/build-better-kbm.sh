@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Integration 29: build the complete in-tree beta 8 source in a separate target.
+# Integration 33: build the complete in-tree beta 9 source in a separate target.
 set -euo pipefail
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 # Keep the previous two-argument convention; the old base checkout is no longer needed.
-engine_target="${2:-${BB_ENGINE_TARGET:-$root/../BetterKBM-engine-beta8}}"
-previous="${BB_PREVIOUS_ENGINE:-$root/../BetterKBM-engine-beta6}"
+engine_target="${2:-${BB_ENGINE_TARGET:-$root/../BetterKBM-engine-beta9}}"
+previous="${BB_PREVIOUS_ENGINE:-$root/../BetterKBM-engine-beta8}"
 [[ -d "$previous" ]] || previous="$root/../BetterKBM-engine-expanded"
 [[ ${MSYSTEM:-} == CLANG64 ]] || { echo 'Open MSYS2 CLANG64 and run this script there.' >&2; exit 1; }
 for executable in cmake ninja clang python3 cygpath curl; do
@@ -99,12 +99,12 @@ python3 - "$engine_target" <<'PY'
 from pathlib import Path
 import hashlib,json,sys,datetime
 root=Path(sys.argv[1]);out=root/'out'
-stamp={'integration':'better-kbm-native-source','version':29,'upstream':'f029d89e934f0f8aac672e80c41e35caa9bd4146','upstream_release':'0.9.37 beta 8','built_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+stamp={'integration':'better-kbm-native-source','version':33,'upstream':'08173e6cbfcfd2191594ca28ad8373c7e9ccc895','upstream_release':'0.9.37 beta 9','built_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
        'executables':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in [out/'bb-probe.exe',out/'bb-start.exe',out/'bb-shader-lab.exe',out/'bb-engine-assets.exe']}}
 (out/'better-kbm-build.json').write_text(json.dumps(stamp),encoding='utf-8')
 print('Verified native build:',stamp['upstream_release'],stamp['upstream'])
 PY
 bash "$root/tools/build-launcher-only.sh"
 printf '\nLauncher: %s\nEngine folder: %s\n' "$(cygpath -w "$root/LauncherApp/Bloodborne Launcher.exe")" "$(cygpath -w "$engine_target")"
-echo 'IMPORTANT: select the NEW BetterKBM-engine-beta8 folder in the launcher before testing.'
-echo 'The session log must say: BetterKBM native engine integration 29 | upstream f029d89e...'
+echo 'IMPORTANT: select the NEW BetterKBM-engine-beta9 folder in the launcher before testing.'
+echo 'The session log must say: BetterKBM native engine integration 33 | upstream 08173e6c...'

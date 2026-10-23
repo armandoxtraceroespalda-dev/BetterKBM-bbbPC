@@ -59,6 +59,9 @@ namespace BloodborneLauncher.Views
         private void BuildInfoSettings()
         {
             Group(UiText.T("Info"));
+            IniToggle(SymbolRegular.Wrench24, UiText.T("Note while shaders build"),
+                UiText.T("\"Building shaders\" in a corner while the game builds shaders for a place it shows for the first time. Also in game: Insert or L3 + R3"),
+                "compile_note");
             IniToggle(SymbolRegular.DataUsage24, UiText.T(PcText.Get("Show FPS")), null,
                 "show_fps", changed: UpdateCounterOptions);
             foreach (var (icon, key, title) in new[]

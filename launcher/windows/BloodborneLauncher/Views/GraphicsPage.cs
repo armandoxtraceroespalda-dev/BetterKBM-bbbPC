@@ -17,6 +17,7 @@ namespace BloodborneLauncher.Views
 
         private readonly ComboBox _gpuSelector;
         private readonly OptionRows _pictureOptions = new();
+        private readonly OptionRows _dlssOptions = new();
         private void UpdatePictureOptions()
         {
             _pictureOptions.IsEnabled = Ini.Flag("graphics_controls");
@@ -65,6 +66,74 @@ namespace BloodborneLauncher.Views
             SettingCombo(SymbolRegular.Image24, BloodborneLauncher.Core.UiText.T("Vsync"), BloodborneLauncher.Core.UiText.T(PcText.Get("Synchronizes frames with the display to prevent image tearing. The selected mode affects latency and how late frames are displayed.")), Choices.PresentModes, "present_mode");
 
 
+            SettingsColumns.SetTwoColumns(Group(UiText.T("Upscaler")), true);
+            var upscalerRows = new OptionRows();
+            Body.Children.Add(upscalerRows);
+            var fsr411 = Fsr4VkFound() || Directory.Exists(Fsr411Dir());
+            if (!fsr411 && Ini.Get("upscaler") == "fsr411") Ini.Set("upscaler", "fsr4");
+            UpscalerChoices(fsr411 ? Choices.Upscalers : Choices.Upscalers.Where(c => c.Value != "fsr411").ToArray(),
+                "upscaler", null, upscalerRows, out _upscalerHint);
+
+            upscalerRows.Children.Add(UpscalerSubtitle("Quality preset"));
+            var presetChoices = Choices.Presets.Select(choice => new Choice(UiText.T(choice.Value switch {
+                "0" => "Native AA", "1" => "Quality", "2" => "Balanced", "3" => "Performance",
+                "4" => "Ultra Performance", _ => "Custom" }), choice.Value, choice.Label)).ToArray();
+            _presetCard = UpscalerChoices(presetChoices, "preset",
+                UiText.T("How far below the output resolution the game renders"), upscalerRows, out _);
+            SliderRow(SymbolRegular.SlideSize24, UiText.T("Render scale (Custom preset)"),
+                UiText.T("Output size divided by this is the render size: 1.00 renders at the output, 1.30 a little below, 3.00 like Ultra Performance. FSR 4 and DLSS use the nearest preset's model"),
+                1.0, 3.0, 0.05, () => ParseDouble(Ini.Get("render_scale", "1.30"), 1.3), v => Ini.Set("render_scale", Fmt(v)),
+                format: "x0.00", into: upscalerRows, valueWidth: 56);
+            _renderScaleCard = (SettingRow)upscalerRows.Children[^1];
+            IniToggle(SymbolRegular.Eyedropper24, UiText.T("Sharpening (RCAS)"),
+                UiText.T("Works with every option above, TAA included: turn it up if the picture looks soft"), "sharpen", upscalerRows);
+            _sharpenCard = (SettingRow)upscalerRows.Children[^1];
+            SliderRow(SymbolRegular.SlideSize24, UiText.T("Sharpening strength"),
+                UiText.T("Up to 1: the upscaler's own sharpening. Above 1: an extra pass"), 0, 2, 0.05,
+                () => ParseDouble(Ini.Get("sharpness"), 0.5), v => Ini.Set("sharpness", Fmt(v)), into: upscalerRows);
+            _sharpnessCard = (SettingRow)upscalerRows.Children[^1];
+            SliderRow(SymbolRegular.Image24, UiText.T("Texture mip bias"),
+                UiText.T("Added to the texture detail the upscaler asks for: below 0 sharper textures (more shimmer), above 0 softer. 0 is the upscaler's own"),
+                -2, 1, 0.05, () => ParseDouble(Ini.Get("mip_bias", "0"), 0), v => Ini.Set("mip_bias", Fmt(v)),
+                format: "+0.00;-0.00;0.00", into: upscalerRows, valueWidth: 56);
+            _mipBiasCard = (SettingRow)upscalerRows.Children[^1];
+            IniToggle(SymbolRegular.ArrowMove24, UiText.T("Object motion vectors"),
+                UiText.T("Less ghosting on characters; costs about 10% FPS"), "object_motion", upscalerRows);
+            IniCombo(SymbolRegular.FastForward24, UiText.T("Frame generation"),
+                UiText.T("Extra frames between the game's own: smoother motion, a little more input lag. Needs an upscaler. Off by default"),
+                Choices.FrameGeneration, "frame_gen", upscalerRows, changed: UpdateUpscaler);
+            _frameGenHint = (TextBlock)((SettingRow)upscalerRows.Children[^1]).Tag;
+            IniToggle(SymbolRegular.Timer24, UiText.T("Frame generation: even pacing (Uncapped)"),
+                UiText.T("With the Uncapped frame rate: the game at the refresh rate divided by the frames shown per game frame, so every generated frame reaches the screen. The fixed rates (30 to 144) are left as they are"),
+                "frame_gen_cap", upscalerRows);
+            _frameGenCapCard = (SettingRow)upscalerRows.Children[^1];
+
+            var dlssMore = _dlssOptions;
+            upscalerRows.Children.Add(dlssMore);
+            dlssMore.Children.Add(UpscalerSubtitle("DLSS options"));
+            IniCombo(SymbolRegular.Sparkle24, UiText.T("DLSS model"),
+                UiText.T("Which NVIDIA model DLSS runs. Also in game (Insert or L3 + R3), where it changes at once"),
+                Choices.DlssModels, "dlss_preset", dlssMore);
+            ToggleRow(SymbolRegular.BrightnessHigh24, UiText.T("DLSS auto exposure"),
+                UiText.T("DLSS works out each frame's exposure itself, for the game's finished frame too. Can calm ghosting in dark scenes"),
+                () => Ini.Get("dlss_auto_exposure", "0") == "1", v => Ini.Set("dlss_auto_exposure", v ? "1" : "0"), dlssMore);
+            ToggleRow(SymbolRegular.Image24, UiText.T("DLSS sharper textures"),
+                UiText.T("One more mip level of texture detail under DLSS, as NVIDIA's guide asks. Off: the render-to-output ratio only"),
+                () => Ini.Get("dlss_mip_bias", "1") != "0", v => Ini.Set("dlss_mip_bias", v ? "1" : "0"), dlssMore);
+            IniCombo(SymbolRegular.FastForward24, UiText.T("DLSS generated frames"),
+                UiText.T("Frames shown per frame the game renders. More than 2x needs an RTX 50 GPU; the engine keeps to what the GPU allows"),
+                Choices.FrameGenFrames, "frame_gen_frames", dlssMore);
+            _frameGenFramesCard = (SettingRow)dlssMore.Children[^1];
+            IniToggle(SymbolRegular.TopSpeed24, UiText.T("DLSS dynamic frame generation"),
+                UiText.T("RTX 50: the driver picks 2x, 3x or 4x moment by moment to reach your refresh rate, up to the generated frames above. Fewer generated frames when the game is fast: less lag, fewer artifacts. Also in game, with a target FPS"),
+                "frame_gen_dynamic", dlssMore);
+            _frameGenDynamicCard = (SettingRow)dlssMore.Children[^1];
+            IniCombo(SymbolRegular.Flash24, UiText.T("NVIDIA Reflex"),
+                UiText.T("Keeps the GPU's queue short for lower input lag. Always on while DLSS Frame Generation runs"),
+                Choices.Reflex, "reflex", dlssMore);
+            _reflexCard = (SettingRow)dlssMore.Children[^1];
+            Add(Card(SymbolRegular.DeveloperBoard24, "DLSS", "", null, out _dlssHint), dlssMore);
+
             Group(BloodborneLauncher.Core.UiText.T("Game effects"));
             Body.Children.Add(Text(BloodborneLauncher.Core.UiText.T("Patches to the game, applied when it starts."), "Faint"));
             IniCombo(SymbolRegular.Cube24, BloodborneLauncher.Core.UiText.T("Model detail"), null, Choices.ModelLod, "model_lod");
@@ -89,71 +158,6 @@ namespace BloodborneLauncher.Views
             IniSlider(SymbolRegular.WeatherFog24, BloodborneLauncher.Core.UiText.T("Fog"), 0, 3, "graphics_fog", picture);
             Body.Children.Add(picture);
             UpdatePictureOptions();
-
-            Group(BloodborneLauncher.Core.UiText.T("Upscaler"));
-            // FSR 4.1.1 runs through fsr4vk (in the package) or an fsr4_411 set built from the player's
-            // own AMD DLL: offered when either is there. Without both the setting becomes FSR 4, the
-            // model it would fall back to (#22).
-            var fsr411 = Fsr4VkFound() || Directory.Exists(Fsr411Dir());
-            if (!fsr411 && Ini.Get("upscaler") == "fsr411") Ini.Set("upscaler", "fsr4");
-            IniCombo(SymbolRegular.Sparkle24, BloodborneLauncher.Core.UiText.T("Upscaler"), null,
-                fsr411 ? Choices.Upscalers : Choices.Upscalers.Where(c => c.Value != "fsr411").ToArray(), "upscaler", changed: UpdateUpscaler);
-            _upscalerHint = (TextBlock)((SettingRow)Body.Children[^1]).Tag;
-
-            IniCombo(SymbolRegular.ZoomIn24, BloodborneLauncher.Core.UiText.T("Quality preset"), BloodborneLauncher.Core.UiText.T("How far below the output resolution the game renders"),
-                Choices.Presets, "preset", changed: UpdateUpscaler);
-            _presetCard = (SettingRow)Body.Children[^1];
-            // The Custom preset's ratio (render_scale), the engine's PresetScale: 1.0 renders at the
-            // output (DLAA with DLSS), 3.0 is Ultra Performance.
-            SliderRow(SymbolRegular.SlideSize24, UiText.T("Render scale (Custom preset)"),
-                UiText.T("Output size divided by this is the render size: 1.00 renders at the output, 1.30 a little below, 3.00 like Ultra Performance. FSR 4 and DLSS use the nearest preset's model"),
-                1.0, 3.0, 0.05, () => ParseDouble(Ini.Get("render_scale", "1.30"), 1.3), v => Ini.Set("render_scale", Fmt(v)), format: "x0.00", valueWidth: 56);
-            _renderScaleCard = (SettingRow)Body.Children[^1];
-
-
-
-            IniToggle(SymbolRegular.Eyedropper24, BloodborneLauncher.Core.UiText.T("Sharpening (RCAS)"), BloodborneLauncher.Core.UiText.T("Works with every option above, TAA included: turn it up if the picture looks soft"), "sharpen");
-            _sharpenCard = (SettingRow)Body.Children[^1];
-            SliderRow(SymbolRegular.SlideSize24, BloodborneLauncher.Core.UiText.T("Sharpening strength"), BloodborneLauncher.Core.UiText.T("Up to 1: the upscaler's own sharpening. Above 1: an extra pass"), 0, 2, 0.05,
-                () => ParseDouble(Ini.Get("sharpness"), 0.5), v => Ini.Set("sharpness", Fmt(v)));
-            _sharpnessCard = (SettingRow)Body.Children[^1];
-            SliderRow(SymbolRegular.Image24, UiText.T("Texture mip bias"),
-                UiText.T("Added to the texture detail the upscaler asks for: below 0 sharper textures (more shimmer), above 0 softer. 0 is the upscaler's own"),
-                -2, 1, 0.05, () => ParseDouble(Ini.Get("mip_bias", "0"), 0), v => Ini.Set("mip_bias", Fmt(v)), format: "+0.00;-0.00;0.00", valueWidth: 56);
-            _mipBiasCard = (SettingRow)Body.Children[^1];
-            IniToggle(SymbolRegular.ArrowMove24, UiText.T("Object motion vectors"), UiText.T("Less ghosting on characters; costs about 10% FPS"), "object_motion");
-
-            var dlssMore = new OptionRows();
-            Group(UiText.T("DLSS options"), dlssMore);
-            Body.Children.Add(dlssMore);
-            IniCombo(SymbolRegular.Sparkle24, UiText.T("DLSS model"),
-                UiText.T("Which NVIDIA model DLSS runs. Also in game (Insert or L3 + R3), where it changes at once"), Choices.DlssModels, "dlss_preset", dlssMore);
-            ToggleRow(SymbolRegular.BrightnessHigh24, UiText.T("DLSS auto exposure"),
-                UiText.T("DLSS works out each frame's exposure itself, for the game's finished frame too. Can calm ghosting in dark scenes"),
-                () => Ini.Get("dlss_auto_exposure", "0") == "1", v => Ini.Set("dlss_auto_exposure", v ? "1" : "0"), dlssMore);
-            ToggleRow(SymbolRegular.Image24, UiText.T("DLSS sharper textures"),
-                UiText.T("One more mip level of texture detail under DLSS, as NVIDIA's guide asks. Off: the render-to-output ratio only"),
-                () => Ini.Get("dlss_mip_bias", "1") != "0", v => Ini.Set("dlss_mip_bias", v ? "1" : "0"), dlssMore);
-            Add(Card(SymbolRegular.DeveloperBoard24, "DLSS", "", null, out _dlssHint), dlssMore);
-
-            IniCombo(SymbolRegular.FastForward24, UiText.T("Frame generation"),
-                UiText.T("Extra frames between the game's own: smoother motion, a little more input lag. Needs an upscaler. Off by default"),
-                Choices.FrameGeneration, "frame_gen", changed: UpdateUpscaler);
-            _frameGenHint = (TextBlock)((SettingRow)Body.Children[^1]).Tag;
-            IniCombo(SymbolRegular.FastForward24, UiText.T("DLSS generated frames"),
-                UiText.T("Frames shown per frame the game renders. More than 2x needs an RTX 50 GPU; the engine keeps to what the GPU allows"),
-                Choices.FrameGenFrames, "frame_gen_frames");
-            _frameGenFramesCard = (SettingRow)Body.Children[^1];
-            IniToggle(SymbolRegular.TopSpeed24, UiText.T("DLSS dynamic frame generation"),
-                UiText.T("RTX 50: the driver picks 2x, 3x or 4x moment by moment to reach your refresh rate, up to the generated frames above. Fewer generated frames when the game is fast: less lag, fewer artifacts. Also in game, with a target FPS"), "frame_gen_dynamic");
-            _frameGenDynamicCard = (SettingRow)Body.Children[^1];
-            IniCombo(SymbolRegular.Flash24, UiText.T("NVIDIA Reflex"),
-                UiText.T("Keeps the GPU's queue short for lower input lag. Always on while DLSS Frame Generation runs"),
-                Choices.Reflex, "reflex");
-            _reflexCard = (SettingRow)Body.Children[^1];
-            IniToggle(SymbolRegular.Timer24, UiText.T("Frame generation: even pacing (Uncapped)"),
-                UiText.T("With the Uncapped frame rate: the game at the refresh rate divided by the frames shown per game frame, so every generated frame reaches the screen. The fixed rates (30 to 144) are left as they are"), "frame_gen_cap");
-            _frameGenCapCard = (SettingRow)Body.Children[^1];
 
             BuildHdrSettings();
             BuildInfoSettings();
@@ -247,6 +251,29 @@ namespace BloodborneLauncher.Views
         private static bool DlssFound() =>
             Paths.DlssRuntime != null; // the engine has DLSS built in; NVIDIA's runtime sits beside it
 
+        private static FrameworkElement UpscalerSubtitle(string title)
+        {
+            var text = Text(UiText.T(title), "GroupHeader");
+            text.FontSize = 18.375; text.Margin = new Thickness(0);
+            return new MenuSurface { Child = text, HorizontalAlignment = HorizontalAlignment.Left,
+                Padding = new Thickness(10, 2, 10, 2), Margin = new Thickness(0, 10, 0, 6) };
+        }
+
+        private SettingRow UpscalerChoices(IReadOnlyList<Choice> choices, string key, string? hint,
+            Panel into, out TextBlock note)
+        {
+            if (key == "upscaler") choices = choices.Select(choice => new Choice(
+                choice.Value switch { "dlss" => "DLSS", "taa" => "TAA", _ => choice.Label },
+                choice.Value, choice.Note ?? choice.Label)).ToArray();
+            var strip = new ChoiceStrip(choices);
+            var row = Add(Card(SymbolRegular.Sparkle24, "", hint, strip, out note, wide: true), into);
+            row.HideName(); row.NoteInTooltip = true; note.Tag = row;
+            SettingsColumns.SetFullWidth(row, true);
+            strip.Select(Choices.IndexOf(choices, Ini.Get(key)), notify: false);
+            strip.Changed += index => { Ini.Set(key, choices[index].Value); Ws.SaveSoon(); UpdateUpscaler(); };
+            return row;
+        }
+
         private void UpdateUpscaler()
         {
             var value = Ini.Get("upscaler");
@@ -268,7 +295,11 @@ namespace BloodborneLauncher.Views
                 _ => null,
             };
             SetHint(_upscalerHint, BloodborneLauncher.Core.UiText.T(hint));
-            _presetCard.IsEnabled = value is not ("taa" or "off");
+            var layout = UpscalerLayout.For(value, Ini.Get("preset"));
+            _presetCard.IsEnabled = layout.PresetEnabled;
+            _presetCard.Opacity = layout.PresetEnabled ? 1 : 0.45;
+            _renderScaleCard.Visibility = layout.CustomScaleVisible ? Visibility.Visible : Visibility.Collapsed;
+            _dlssOptions.Visibility = layout.DlssVisible ? Visibility.Visible : Visibility.Collapsed;
             _sharpenCard.IsEnabled = value != "off";
             _sharpnessCard.IsEnabled = value != "off";
             _mipBiasCard.IsEnabled = value != "off";
